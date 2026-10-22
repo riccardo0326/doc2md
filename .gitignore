@@ -1,0 +1,11 @@
+samples/
+docs/samples/
+out/
+bench_runs/
+.doc2md_cache/
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/

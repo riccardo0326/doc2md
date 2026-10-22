@@ -1,0 +1,836 @@
+var CHATBOT_API_URL = "https://chatbot.ai.container.edag/";
+var CHATBOT_COLLECTION = "kelpie";
+var CHATBOT_TITLE = "DARE Kelpie Assistant";
+var CHATBOT_WELCOME = "Hi! I can help you find information in the Kelpie documentation. What would you like to know?";
+
+(function () {
+  "use strict";
+
+  /* --- Load marked.js for Markdown rendering --- */
+  (function () {
+    if (document.querySelector('script[src*="marked"]')) return;
+    var s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/marked/marked.min.js";
+    document.head.appendChild(s);
+  })();
+
+  function renderMarkdown(text) {
+    if (typeof marked !== "undefined" && marked.parse) {
+      return marked.parse(text, { breaks: true, gfm: true });
+    }
+    /* Fallback: escape HTML and convert newlines */
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\n/g, "<br>");
+  }
+
+  /* --- SPA-style navigation interceptor --- */
+  /* Intercepts sidebar and prev/next nav clicks to swap page content  */
+  /* without a full reload, keeping the chatbot (and its SSE streams)  */
+  /* alive in the DOM.                                                 */
+  (function initSpaNav() {
+    var spaNavigating = false;
+
+    function normalizeSidebarLinks() {
+      var links = document.querySelectorAll("#mdbook-sidebar a[href]");
+      for (var i = 0; i < links.length; i++) {
+        var href = links[i].getAttribute("href");
+        if (href && !href.startsWith("#") && !/^(?:[a-z+]+:)?\/\//.test(href)) {
+          links[i].setAttribute("href", links[i].href);
+        }
+      }
+    }
+
+    normalizeSidebarLinks();
+
+    function shouldIntercept(anchor) {
+      if (!anchor || !anchor.href) return false;
+      if (anchor.origin !== location.origin) return false;
+      /* Skip same-page hash links */
+      if (anchor.pathname === location.pathname && anchor.hash) return false;
+      /* Skip print.html */
+      if (anchor.pathname.endsWith("/print.html")) return false;
+
+      /* Only intercept sidebar links and prev/next navigation */
+      var sidebar = document.getElementById("mdbook-sidebar");
+      if (sidebar && sidebar.contains(anchor)) return true;
+      if (anchor.classList.contains("nav-chapters")) return true;
+      if (anchor.classList.contains("mobile-nav-chapters")) return true;
+      return false;
+    }
+
+    function getNavigationUrl(anchor) {
+      return anchor.href;
+    }
+
+    function fetchAndSwap(url, pushState) {
+      if (spaNavigating) return;
+      spaNavigating = true;
+
+      fetch(url)
+        .then(function (res) {
+          if (!res.ok) throw new Error(res.status);
+          return res.text();
+        })
+        .then(function (html) {
+          var parser = new DOMParser();
+          var doc = parser.parseFromString(html, "text/html");
+
+          /* Update document title */
+          var newTitle = doc.querySelector("title");
+          if (newTitle) document.title = newTitle.textContent;
+
+          /* Update path_to_root global */
+          var headScripts = doc.querySelectorAll("head script");
+          for (var i = 0; i < headScripts.length; i++) {
+            var match = headScripts[i].textContent.match(
+              /path_to_root\s*=\s*"([^"]*)"/
+            );
+            if (match) {
+              window.path_to_root = match[1];
+              break;
+            }
+          }
+
+          /* Swap main content area */
+          var newContent = doc.getElementById("mdbook-content");
+          var oldContent = document.getElementById("mdbook-content");
+          if (newContent && oldContent) {
+            oldContent.innerHTML = newContent.innerHTML;
+          }
+
+          /* Swap desktop prev/next navigation */
+          var newNav = doc.querySelector(".nav-wide-wrapper");
+          var oldNav = document.querySelector(".nav-wide-wrapper");
+          if (newNav && oldNav) {
+            oldNav.innerHTML = newNav.innerHTML;
+          }
+
+          /* Update sidebar active state and rebuild "on this page" TOC */
+          spaUpdateSidebarActive(url);
+          spaRebuildOnThisPage();
+
+          /* Re-run syntax highlighting on new code blocks */
+          spaRehighlight();
+
+          /* Re-attach clipboard mouseout handlers on new code blocks */
+          spaReinitClipboard();
+
+          if (pushState) {
+            history.pushState({}, "", url);
+          }
+
+          /* Scroll to anchor target or top of page */
+          var hash = url.split("#")[1];
+          if (hash) {
+            var target = document.getElementById(hash);
+            if (target) {
+              target.scrollIntoView();
+              return;
+            }
+          }
+          document.scrollingElement.scrollTo(0, 0);
+        })
+        .catch(function () {
+          /* Fallback to full page load on fetch error */
+          location.href = url;
+        })
+        .finally(function () {
+          spaNavigating = false;
+        });
+    }
+
+    function spaUpdateSidebarActive(url) {
+      var oldActive = document.querySelector("#mdbook-sidebar .active");
+      if (oldActive) oldActive.classList.remove("active");
+
+      /* Remove previous "on this page" header list */
+      var oldOnThisPage = document.querySelector(".on-this-page");
+      if (oldOnThisPage) oldOnThisPage.remove();
+
+      /* Normalise URL for comparison */
+      var currentPage = url.split("#")[0].split("?")[0];
+      if (currentPage.endsWith("/")) currentPage += "index.html";
+
+      var links = document.querySelectorAll("#mdbook-sidebar a[href]");
+      for (var i = 0; i < links.length; i++) {
+        var linkHref = links[i].href.split("#")[0].split("?")[0];
+        if (linkHref === currentPage) {
+          links[i].classList.add("active");
+          var parent = links[i].parentElement;
+          while (parent) {
+            if (
+              parent.tagName === "LI" &&
+              parent.classList.contains("chapter-item")
+            ) {
+              parent.classList.add("expanded");
+            }
+            parent = parent.parentElement;
+          }
+          break;
+        }
+      }
+
+      var activeEl = document.querySelector("#mdbook-sidebar .active");
+      if (activeEl) activeEl.scrollIntoView({ block: "center" });
+    }
+
+    /* Rebuild the "on this page" header sidebar (replicates toc.js logic) */
+    function spaRebuildOnThisPage() {
+      var activeSection = document.querySelector("#mdbook-sidebar .active");
+      if (!activeSection) return;
+
+      var main = document.querySelector("main");
+      if (!main) return;
+
+      var hdrs = [];
+      var all = main.querySelectorAll("h2, h3, h4, h5, h6");
+      for (var h = 0; h < all.length; h++) {
+        if (
+          all[h].id !== "" &&
+          all[h].children.length > 0 &&
+          all[h].children[0].tagName === "A"
+        ) {
+          hdrs.push(all[h]);
+        }
+      }
+      if (hdrs.length === 0) return;
+
+      var stack = [];
+      var firstLevel = parseInt(hdrs[0].tagName.charAt(1));
+      for (var lvl = 1; lvl < firstLevel; lvl++) {
+        var ol = document.createElement("ol");
+        ol.classList.add("section");
+        if (stack.length > 0) stack[stack.length - 1].ol.appendChild(ol);
+        stack.push({ level: lvl + 1, ol: ol });
+      }
+
+      var foldLevel = 3;
+
+      for (var i = 0; i < hdrs.length; i++) {
+        var header = hdrs[i];
+        var level = parseInt(header.tagName.charAt(1));
+        var curLevel = stack[stack.length - 1].level;
+
+        if (level > curLevel) {
+          for (var nl = curLevel + 1; nl <= level; nl++) {
+            var nested = document.createElement("ol");
+            nested.classList.add("section");
+            var last = stack[stack.length - 1];
+            var lastChild = last.ol.lastChild;
+            if (lastChild) lastChild.appendChild(nested);
+            else last.ol.appendChild(nested);
+            stack.push({ level: nl, ol: nested });
+          }
+        } else if (level < curLevel) {
+          while (stack.length > 1 && stack[stack.length - 1].level > level) {
+            stack.pop();
+          }
+        }
+
+        var li = document.createElement("li");
+        li.classList.add("header-item");
+        li.classList.add("expanded");
+
+        var span = document.createElement("span");
+        span.classList.add("chapter-link-wrapper");
+        var a = document.createElement("a");
+        a.href = "#" + header.id;
+        a.classList.add("header-in-summary");
+        span.appendChild(a);
+
+        /* Clone header content, strip <mark> elements */
+        var clone = header.children[0].cloneNode(true);
+        var marks = clone.querySelectorAll("mark");
+        for (var m = 0; m < marks.length; m++) {
+          while (marks[m].firstChild)
+            marks[m].parentNode.insertBefore(marks[m].firstChild, marks[m]);
+          marks[m].remove();
+        }
+        while (clone.firstChild) a.appendChild(clone.firstChild);
+
+        /* Add fold toggle for deeply nested headers */
+        var nextHdr = hdrs[i + 1];
+        if (nextHdr) {
+          var nextLvl = parseInt(nextHdr.tagName.charAt(1));
+          if (nextLvl > level && level >= foldLevel) {
+            var toggle = document.createElement("a");
+            toggle.classList.add("chapter-fold-toggle");
+            toggle.classList.add("header-toggle");
+            (function (theLi) {
+              toggle.addEventListener("click", function () {
+                theLi.classList.toggle("expanded");
+              });
+            })(li);
+            var toggleDiv = document.createElement("div");
+            toggleDiv.textContent = "\u2771";
+            toggle.appendChild(toggleDiv);
+            span.appendChild(toggle);
+          }
+        }
+
+        li.appendChild(span);
+        stack[stack.length - 1].ol.appendChild(li);
+      }
+
+      var onThisPage = document.createElement("div");
+      onThisPage.classList.add("on-this-page");
+      onThisPage.appendChild(stack[0].ol);
+      var activeItemSpan = activeSection.parentElement;
+      if (activeItemSpan) activeItemSpan.after(onThisPage);
+    }
+
+    function spaRehighlight() {
+      var codeNodes = document.querySelectorAll("#mdbook-content code");
+      for (var i = 0; i < codeNodes.length; i++) {
+        var node = codeNodes[i];
+        if (node.parentElement.classList.contains("header")) continue;
+        hljs.highlightBlock(node);
+        node.classList.add("hljs");
+      }
+    }
+
+    function spaReinitClipboard() {
+      var clipButtons = document.querySelectorAll("#mdbook-content .clip-button");
+      for (var c = 0; c < clipButtons.length; c++) {
+        (function (btn) {
+          btn.addEventListener("mouseout", function () {
+            btn.firstChild.innerText = "";
+            btn.className = "clip-button";
+          });
+        })(clipButtons[c]);
+      }
+    }
+
+    /* Delegated click listener for navigation links */
+    document.addEventListener("click", function (e) {
+      if (e.defaultPrevented || e.button !== 0) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+      var anchor = e.target.closest ? e.target.closest("a") : null;
+      if (!anchor || !shouldIntercept(anchor)) return;
+
+      e.preventDefault();
+      fetchAndSwap(getNavigationUrl(anchor), true);
+    });
+
+    /* Handle browser back / forward buttons */
+    window.addEventListener("popstate", function () {
+      fetchAndSwap(location.href, false);
+    });
+  })();
+
+  function initChatbot() {
+    /* Prevent duplicate chatbot widgets */
+    if (document.querySelector(".chatbot-toggle")) return;
+    /* --- Inject HTML --- */
+    var container = document.createElement("div");
+    container.innerHTML =
+      '<button class="chatbot-toggle" aria-label="Open chatbot">' +
+      '<svg class="chatbot-icon-chat" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">' +
+      '<path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/>' +
+      "</svg>" +
+      '<svg class="chatbot-icon-close" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">' +
+      '<path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>' +
+      "</svg>" +
+      "</button>" +
+      '<div class="chatbot-backdrop"></div>' +
+      '<div class="chatbot-panel" role="dialog" aria-label="Chatbot">' +
+      '<div class="chatbot-header">' +
+      '<span>' + CHATBOT_TITLE + '</span>' +
+      '<div class="chatbot-header-actions">' +
+      '<button class="chatbot-reset" type="button" aria-label="Reset conversation" title="Reset conversation">' +
+      '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.65 6.35A7.96 7.96 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>' +
+      '</button>' +
+      '<button class="chatbot-close" type="button" aria-label="Close chatbot" title="Close chatbot">' +
+      '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>' +
+      '</button>' +
+      '</div>' +
+      '</div>' +
+      '<div class="chatbot-messages"></div>' +
+      '<div class="chatbot-input-area">' +
+      '<textarea rows="1" placeholder="Ask a question\u2026" aria-label="Chat message"></textarea>' +
+      '<button type="button" aria-label="Send message">' +
+      '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>' +
+      "</button>" +
+      "</div>" +
+      '<div class="chatbot-input-hint"></div>' +
+      "</div>";
+
+    document.body.appendChild(container);
+
+    /* --- Element references --- */
+    var toggle = container.querySelector(".chatbot-toggle");
+    var panel = container.querySelector(".chatbot-panel");
+    var messages = container.querySelector(".chatbot-messages");
+    var textarea = container.querySelector(".chatbot-input-area textarea");
+    var sendBtn = container.querySelector(".chatbot-input-area button");
+    var resetBtn = container.querySelector(".chatbot-reset");
+    var closeBtn = container.querySelector(".chatbot-close");
+    var backdrop = container.querySelector(".chatbot-backdrop");
+    var inputHint = container.querySelector(".chatbot-input-hint");
+    var opened = false;
+    var welcomed = false;
+    var loading = false;
+    var chatHistory = [];
+    var streamingText = "";
+
+    var SESSION_KEY = "chatbot_session_" + CHATBOT_COLLECTION;
+
+    function saveSession() {
+      var data = { chatHistory: chatHistory, html: messages.innerHTML, welcomed: welcomed, opened: opened, streamingText: streamingText, scrollTop: messages.scrollTop };
+      try { localStorage.setItem(SESSION_KEY, JSON.stringify(data)); } catch (e) { }
+    }
+
+    function restoreSession() {
+      try {
+        var raw = localStorage.getItem(SESSION_KEY);
+        if (!raw) return false;
+        var data = JSON.parse(raw);
+        if (data.welcomed || (data.chatHistory && data.chatHistory.length > 0)) {
+          chatHistory = data.chatHistory || [];
+          messages.innerHTML = data.html || "";
+          welcomed = !!data.welcomed;
+          if (data.opened) {
+            opened = true;
+            panel.classList.add("open");
+            toggle.classList.add("open");
+            backdrop.classList.add("open");
+            toggle.setAttribute("aria-label", "Close chatbot");
+            document.body.style.overflow = "hidden";
+          }
+
+          /* Clean up artifacts from an interrupted stream */
+          var thinkingEls = messages.querySelectorAll(".chatbot-thinking");
+          for (var t = 0; t < thinkingEls.length; t++) thinkingEls[t].remove();
+          var hiddenBots = messages.querySelectorAll('.chatbot-msg.bot[style*="display: none"]');
+          for (var h = 0; h < hiddenBots.length; h++) hiddenBots[h].remove();
+          /* Commit partial streamed response if the page was left mid-stream */
+          if (chatHistory.length > 0 && chatHistory[chatHistory.length - 1].role === "user") {
+            if (data.streamingText) {
+              chatHistory.push({ role: "assistant", content: data.streamingText });
+              appendBotRaw(renderMarkdown(data.streamingText));
+            } else {
+              /* No tokens arrived yet — drop the unanswered question */
+              chatHistory.pop();
+              var userMsgs = messages.querySelectorAll(".chatbot-msg.user");
+              if (userMsgs.length > 0) userMsgs[userMsgs.length - 1].remove();
+            }
+          }
+
+          /* Re-bind source link click handlers */
+          rebindSourceLinks();
+          if (data.scrollTop != null) {
+            requestAnimationFrame(function () { messages.scrollTop = data.scrollTop; });
+          }
+          return true;
+        }
+      } catch (e) { }
+      return false;
+    }
+
+    function rebindSourceLinks() {
+      var links = messages.querySelectorAll(".chatbot-sources a");
+      for (var i = 0; i < links.length; i++) {
+        (function (a) {
+          var term = a.textContent;
+          a.addEventListener("click", function (e) {
+            e.preventDefault();
+            triggerMdBookSearch(term);
+          });
+        })(links[i]);
+      }
+    }
+
+    function resetSession() {
+      chatHistory = [];
+      welcomed = false;
+      messages.innerHTML = "";
+      try { localStorage.removeItem(SESSION_KEY); } catch (e) { }
+    }
+
+    /* Restore previous session on load */
+    restoreSession();
+
+    /* Save session before navigating away */
+    window.addEventListener("beforeunload", saveSession);
+
+    /* Remove obsolete resize data from previous version */
+    try { localStorage.removeItem("chatbot_size"); } catch (e) { }
+
+    /* --- Open / Close helpers --- */
+    function openPanel() {
+      opened = true;
+      panel.classList.add("open");
+      toggle.classList.add("open");
+      backdrop.classList.add("open");
+      toggle.setAttribute("aria-label", "Close chatbot");
+      document.body.style.overflow = "hidden";
+      if (!welcomed) {
+        welcomed = true;
+        appendBot(CHATBOT_WELCOME);
+      }
+      textarea.focus();
+      saveSession();
+    }
+
+    function closePanel() {
+      opened = false;
+      panel.classList.remove("open");
+      toggle.classList.remove("open");
+      backdrop.classList.remove("open");
+      toggle.setAttribute("aria-label", "Open chatbot");
+      document.body.style.overflow = "";
+      saveSession();
+    }
+
+    /* --- Toggle panel --- */
+    toggle.addEventListener("click", function () {
+      if (opened) {
+        closePanel();
+      } else {
+        openPanel();
+      }
+    });
+
+    /* --- Close on Escape key --- */
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && opened) {
+        closePanel();
+      }
+    });
+
+    /* --- Close on backdrop click --- */
+    backdrop.addEventListener("click", function () {
+      if (opened) {
+        closePanel();
+      }
+    });
+
+    /* --- Close button in header --- */
+    closeBtn.addEventListener("click", function () {
+      if (opened) {
+        closePanel();
+      }
+    });
+
+    /* --- Reset button --- */
+    resetBtn.addEventListener("click", function () {
+      resetSession();
+      welcomed = true;
+      appendBot(
+        CHATBOT_WELCOME
+      );
+      saveSession();
+    });
+
+    /* --- Send message --- */
+    var MIN_QUESTION_LENGTH = 10;
+
+    function send() {
+      var text = textarea.value.trim();
+      if (!text || loading) return;
+
+      if (text.length < MIN_QUESTION_LENGTH) {
+        textarea.classList.add("chatbot-input-error");
+        inputHint.textContent = "Please enter at least " + MIN_QUESTION_LENGTH + " characters";
+        return;
+      }
+
+      textarea.classList.remove("chatbot-input-error");
+      inputHint.textContent = "";
+      appendUser(text);
+      textarea.value = "";
+      autoResize();
+      queryApi(text);
+    }
+
+    sendBtn.addEventListener("click", send);
+
+    /* Prevent mdBook global shortcuts from intercepting chatbot input */
+    ["keydown", "keyup", "keypress"].forEach(function (evt) {
+      textarea.addEventListener(evt, function (e) {
+        if (e.key !== "Escape") e.stopPropagation();
+      });
+    });
+
+    textarea.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        send();
+      }
+    });
+
+    /* --- Auto-resize textarea --- */
+    function autoResize() {
+      textarea.style.height = "auto";
+      textarea.style.height = Math.min(textarea.scrollHeight, 100) + "px";
+    }
+
+    textarea.addEventListener("input", autoResize);
+
+    textarea.addEventListener("input", function () {
+      if (textarea.value.trim().length >= MIN_QUESTION_LENGTH) {
+        textarea.classList.remove("chatbot-input-error");
+        inputHint.textContent = "";
+      }
+    });
+
+    /* --- Append messages --- */
+    function appendBotRaw(html) {
+      var div = document.createElement("div");
+      div.className = "chatbot-msg bot";
+      var content = document.createElement("div");
+      content.className = "chatbot-msg-content";
+      content.innerHTML = html;
+      div.appendChild(content);
+      messages.appendChild(div);
+      scrollToBottom();
+    }
+
+    function appendUser(text) {
+      var div = document.createElement("div");
+      div.className = "chatbot-msg user";
+      div.textContent = text;
+      messages.appendChild(div);
+      scrollToBottom();
+      saveSession();
+    }
+
+    function appendBot(text, sources) {
+      var div = document.createElement("div");
+      div.className = "chatbot-msg bot";
+      var content = document.createElement("div");
+      content.className = "chatbot-msg-content";
+      content.innerHTML = renderMarkdown(text);
+      div.appendChild(content);
+
+      if (sources && sources.length > 0) {
+        appendSources(div, sources);
+      }
+
+      messages.appendChild(div);
+      scrollToBottom();
+      saveSession();
+    }
+
+    function extractFilename(src) {
+      var str = typeof src === "string" ? src : JSON.stringify(src);
+      /* Strip trailing slashes, take last path segment, drop extension */
+      var name = str.replace(/\/+$/, "").split("/").pop() || str;
+      return name.replace(/\.[^.]+$/, "");
+    }
+
+    function triggerMdBookSearch(term) {
+      var searchToggle = document.getElementById("mdbook-search-toggle");
+      var searchInput = document.getElementById("mdbook-searchbar");
+      if (!searchInput || !searchToggle) return;
+
+      /*
+       * Set the value BEFORE opening search. mdBook's init() reads
+       * searchbar.value after the index loads and calls doSearch().
+       */
+      searchInput.value = term;
+
+      var searchWrapper = document.getElementById("mdbook-search-wrapper");
+      var indexAlreadyLoaded = !!document.getElementById("mdbook-search-index");
+
+      if (searchWrapper && searchWrapper.classList.contains("hidden")) {
+        /* Opens search UI and triggers index load (first time) or is a no-op */
+        searchToggle.click();
+      }
+
+      if (indexAlreadyLoaded) {
+        /*
+         * Index is already loaded, init() won't run again.
+         * Reset current_searchterm so doSearch doesn't skip as "same term".
+         * We do this by clearing then re-setting the value and dispatching keyup.
+         */
+        searchInput.value = "";
+        searchInput.dispatchEvent(new Event("keyup"));
+        searchInput.value = term;
+        searchInput.classList.add("active");
+        searchInput.dispatchEvent(new Event("keyup"));
+      }
+      /* If index is not yet loaded, init() will pick up searchbar.value on onload */
+    }
+
+    function appendSources(parentDiv, sources) {
+      if (!sources || sources.length === 0) return;
+
+      var details = document.createElement("details");
+      details.className = "chatbot-sources";
+      var summary = document.createElement("summary");
+      summary.textContent = "Sources (" + sources.length + ")";
+      details.appendChild(summary);
+
+      var ul = document.createElement("ul");
+      for (var i = 0; i < sources.length; i++) {
+        var li = document.createElement("li");
+        var src = sources[i];
+        var filename = extractFilename(src);
+        var a = document.createElement("a");
+        a.href = "#";
+        a.textContent = filename;
+        a.title = typeof src === "string" ? src : JSON.stringify(src);
+        (function (term) {
+          a.addEventListener("click", function (e) {
+            e.preventDefault();
+            triggerMdBookSearch(term);
+          });
+        })(filename);
+        li.appendChild(a);
+        ul.appendChild(li);
+      }
+      details.appendChild(ul);
+      parentDiv.appendChild(details);
+    }
+
+    function showThinking() {
+      var div = document.createElement("div");
+      div.className = "chatbot-thinking";
+      div.innerHTML = "<span></span><span></span><span></span>";
+      messages.appendChild(div);
+      scrollToBottom();
+      return div;
+    }
+
+    function scrollToBottom() {
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    /* --- API call with SSE streaming --- */
+    function queryApi(question) {
+      loading = true;
+      textarea.disabled = true;
+      sendBtn.disabled = true;
+
+      var historyToSend = chatHistory.slice();
+      chatHistory.push({ role: "user", content: question });
+      streamingText = "";
+
+      var thinking = showThinking();
+
+      var baseUrl = CHATBOT_API_URL.replace(/\/+$/, "");
+      fetch(baseUrl + "/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: question, collection: CHATBOT_COLLECTION, history: historyToSend }),
+      })
+        .then(function (res) {
+          if (!res.ok) throw new Error("Server returned " + res.status);
+
+          /* Create bot message container for streamed content (hidden until first token) */
+          var botDiv = document.createElement("div");
+          botDiv.className = "chatbot-msg bot";
+          botDiv.style.display = "none";
+          var contentDiv = document.createElement("div");
+          contentDiv.className = "chatbot-msg-content";
+          botDiv.appendChild(contentDiv);
+          messages.appendChild(botDiv);
+
+          var reader = res.body.getReader();
+          var decoder = new TextDecoder();
+          var buffer = "";
+          streamingText = "";
+          var firstToken = true;
+
+          function pump() {
+            return reader.read().then(function (result) {
+              if (result.done) {
+                if (thinking.parentNode) thinking.remove();
+                if (streamingText) {
+                  contentDiv.innerHTML = renderMarkdown(streamingText);
+                  botDiv.style.display = "";
+                }
+                if (streamingText)
+                  chatHistory.push({ role: "assistant", content: streamingText });
+                streamingText = "";
+                saveSession();
+                return;
+              }
+
+              buffer += decoder.decode(result.value, { stream: true });
+              var lines = buffer.split("\n");
+              buffer = lines.pop();
+
+              for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trim();
+                if (!line.startsWith("data: ")) continue;
+                var payload = line.slice(6);
+
+                if (payload === "[DONE]") {
+                  if (thinking.parentNode) thinking.remove();
+                  botDiv.style.display = "";
+                  if (streamingText)
+                    chatHistory.push({ role: "assistant", content: streamingText });
+                  streamingText = "";
+                  saveSession();
+                  return;
+                }
+
+                try {
+                  var evt = JSON.parse(payload);
+                  if (evt.type === "token") {
+                    if (firstToken) {
+                      firstToken = false;
+                      thinking.remove();
+                      botDiv.style.display = "";
+                    }
+                    streamingText += evt.content;
+                    contentDiv.innerHTML = renderMarkdown(streamingText);
+                    scrollToBottom();
+                  } else if (evt.type === "sources") {
+                    appendSources(botDiv, evt.sources);
+                    scrollToBottom();
+                  } else if (evt.type === "error") {
+                    if (thinking.parentNode) thinking.remove();
+                    botDiv.style.display = "";
+                    contentDiv.textContent =
+                      "Sorry, something went wrong: " + evt.detail;
+                    streamingText = "";
+                    return;
+                  }
+                } catch (e) {
+                  /* skip unparseable lines */
+                }
+              }
+
+              return pump();
+            });
+          }
+
+          return pump().catch(function () {
+            if (!streamingText) {
+              contentDiv.textContent =
+                "Sorry, the connection was interrupted. Please try again.";
+            }
+            streamingText = "";
+          });
+        })
+        .catch(function () {
+          if (thinking.parentNode) thinking.remove();
+          chatHistory.pop();
+          appendBot(
+            "Sorry, something went wrong. Please try again later."
+          );
+        })
+        .finally(function () {
+          loading = false;
+          textarea.disabled = false;
+          sendBtn.disabled = false;
+          textarea.focus();
+        });
+    }
+  }
+
+  /* Run on initial load */
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initChatbot);
+  } else {
+    initChatbot();
+  }
+
+})();
