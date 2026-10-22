@@ -8,6 +8,8 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
 FIXTURE_DIR = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "synthetic"
@@ -68,6 +70,18 @@ def _image_only_fixture(path: Path) -> None:
     document.save()
 
 
+def _ligature_fixture(path: Path) -> None:
+    font_path = Path(r"C:\Windows\Fonts\arial.ttf")
+    if not font_path.is_file():
+        raise FileNotFoundError(f"Unicode fixture font not found: {font_path}")
+    pdfmetrics.registerFont(TTFont("FixtureArial", str(font_path)))
+    document = _new_canvas(path)
+    document.setFont("FixtureArial", 14)
+    document.drawString(72, 720, "ﬂow ofﬁce ﬁ ﬂ ﬀ ﬃ ﬄ ﬅ ﬆ")
+    document.showPage()
+    document.save()
+
+
 def main() -> None:
     _text_fixture(
         FIXTURE_DIR / "phase1_text_en.pdf",
@@ -86,6 +100,7 @@ def main() -> None:
     )
     _table_fixture(FIXTURE_DIR / "phase1_table.pdf")
     _image_only_fixture(FIXTURE_DIR / "phase1_image_only.pdf")
+    _ligature_fixture(FIXTURE_DIR / "phase2_ligatures.pdf")
     print(FIXTURE_DIR)
 
 

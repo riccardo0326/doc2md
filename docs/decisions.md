@@ -283,3 +283,14 @@ cover English text, German text, a text-layer table, and an image-only page.
 **Reason:** These fixtures make local verification reproducible without putting
 confidential Oz/Hannes documents in tests. They do not count toward the real
 sample-set requirement for benchmarking.
+
+## ADR-021: Phase 2 normalization boundary
+
+**Decision:** Keep all character and line-break normalization in
+`src/doc2md/converters/pdf/normalize.py`. The fast extractor normalizes the
+whole page while preserving line boundaries, then creates blocks. Garbled
+`(cid:NN)`, replacement, and private-use glyphs are preserved in text and
+flagged in block metadata.
+
+**Reason:** A single pure normalization boundary prevents special-character
+fixes from spreading into routing, rendering, or future hard-path adapters.
