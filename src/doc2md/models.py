@@ -39,6 +39,28 @@ class Provenance(BaseModel):
     bbox: dict[str, float] | None = None
 
 
+class PageSignals(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    chars: int
+    words: int
+    image_area_ratio: float
+    image_count: int
+    table_count: int
+    table_irregular: bool
+    garbled_ratio: float
+    has_text_layer: bool
+
+
+class RouteDecision(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    page: int
+    page_class: PageClass
+    reasons: list[str] = Field(default_factory=list)
+    signals: PageSignals
+
+
 class Block(BaseModel):
     model_config = ConfigDict(frozen=True)
 

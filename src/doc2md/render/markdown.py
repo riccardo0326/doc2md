@@ -20,5 +20,7 @@ def render_markdown(
             if block_anchors:
                 lines.append(f"<!-- block: {block.block_id} -->")
             lines.append(block.markdown)
+        if page.status == "ok" and page.page_class != "TEXT" and not page.blocks:
+            lines.append(f"<!-- page {page.page}: routed to hard path (not yet implemented) -->")
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"

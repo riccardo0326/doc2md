@@ -11,12 +11,15 @@ import pdfplumber
 
 from .config import Config, config_hash
 from .converters.pdf.fast import extract_page
+from .converters.pdf.router import classify
+from .converters.pdf.signals import compute_signals
 from .errors import ConfigError, ConversionFailed, SourceError
 from .models import (
     ConversionResult,
     ConvertedDocument,
     PageResult,
     PageStat,
+    RouteDecision,
     RunStats,
     SourceInfo,
     ToolInfo,
@@ -108,14 +111,27 @@ def convert(
 
                 page_started = time.perf_counter()
                 try:
-                    blocks = extract_page(page, page_number)
-                    result = PageResult(
+                    decision = classify(
+                        compute_signals(page, effective_config.router),
+                        effective_config.router,
                         page=page_number,
-                        status="ok",
-                        page_class="TEXT",
-                        method="pdfplumber",
-                        blocks=blocks,
                     )
+                    if decision.page_class == "TEXT":
+                        result = PageResult(
+                            page=page_number,
+                            status="ok",
+                            page_class=decision.page_class,
+                            method="pdfplumber",
+                            blocks=extract_page(page, page_number),
+                        )
+                    else:
+                        result = PageResult(
+                            page=page_number,
+                            status="ok",
+                            page_class=decision.page_class,
+                            method=None,
+                            warnings=[f"routed_to_hard_path:{','.join(decision.reasons)}"],
+                        )
                 except Exception as error:  # noqa: BLE001 - page failures are isolated
                     result = PageResult(
                         page=page_number,
@@ -195,3 +211,22 @@ def convert(
         run_path=run_path,
         stats=stats,
     )
+
+
+def inspect_pdf(source: str | Path, *, config: Config | None = None) -> list[RouteDecision]:
+    source_path = Path(source)
+    if not source_path.is_file():
+        raise SourceError(f"source does not exist: {source_path}")
+    effective_config = config or Config()
+    try:
+        with pdfplumber.open(str(source_path)) as pdf:
+            return [
+                classify(
+                    compute_signals(page, effective_config.router),
+                    effective_config.router,
+                    page=page_number,
+                )
+                for page_number, page in enumerate(pdf.pages, start=1)
+            ]
+    except Exception as error:  # noqa: BLE001 - source failures become SourceError
+        raise SourceError(f"unable to inspect PDF: {error}") from error

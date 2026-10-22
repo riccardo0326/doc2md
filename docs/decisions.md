@@ -294,3 +294,15 @@ flagged in block metadata.
 
 **Reason:** A single pure normalization boundary prevents special-character
 fixes from spreading into routing, rendering, or future hard-path adapters.
+
+## ADR-022: Phase 3 routing boundary
+
+**Decision:** Compute page signals with pdfplumber, classify them with a pure
+router using typed configuration, and keep `COMPLEX`/`SCANNED` pages as explicit
+hard-path placeholders until Phase 4. `inspect` exposes the signals and route
+reasons; CLI `--set router.key=value` changes only the in-memory inspection
+configuration.
+
+**Reason:** This makes routing decisions observable and testable without
+loading Docling or calling Kelpie, while preserving the later replaceable hard
+path boundary.
