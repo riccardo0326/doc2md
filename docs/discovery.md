@@ -1,6 +1,6 @@
 # Phase 0 Discovery
 
-Status: **signed off by the human to start Phase 1 on 2026-10-22**.
+Status: **signed off by the human; Phase 1 complete on 2026-10-22**.
 
 Date: 2026-10-22
 
@@ -16,8 +16,9 @@ authentication and the OpenAI Python SDK for an OpenAI-compatible DARE gateway.
 The production route is the Responses API, not Chat Completions. Vision content
 is sent as base64 data URLs.
 
-Phase 0 is signed off with the documented A3 sample exception. Phase 1 may
-start; the remaining real-document requirement applies before benchmark work.
+Phase 0 is signed off with the documented A3 sample exception. Phase 1 is
+complete; the remaining real-document requirement applies before benchmark
+work.
 
 ## Environment
 

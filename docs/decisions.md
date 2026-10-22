@@ -261,3 +261,25 @@ pending. The real set must be completed before benchmark work.
 
 **Status:** Accepted by the human as a Phase 0 exception on 2026-10-22. The
 exception ends before benchmark work.
+
+## ADR-019: Phase 1 fast-path scope
+
+**Decision:** Phase 1 implements only the deterministic digital-text fast path
+with pdfplumber. Each non-empty extracted line becomes an ordered paragraph
+block with page provenance; dynamic timing and run identity stay in `run.json`,
+while Markdown and the sidecar remain deterministic.
+
+**Reason:** This is the smallest walking skeleton that proves the public API,
+CLI, page markers, provenance, and artifact layout without loading Docling or
+calling Kelpie. Routing, normalization, images, and hard-path extraction remain
+for their specified later phases.
+
+## ADR-020: Synthetic fixture set
+
+**Decision:** Keep four generated, non-confidential PDFs under
+`tests/fixtures/synthetic/` for repeatable demos and future phase tests. They
+cover English text, German text, a text-layer table, and an image-only page.
+
+**Reason:** These fixtures make local verification reproducible without putting
+confidential Oz/Hannes documents in tests. They do not count toward the real
+sample-set requirement for benchmarking.
