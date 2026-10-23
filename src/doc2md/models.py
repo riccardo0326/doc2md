@@ -92,7 +92,7 @@ class ImageRecord(BaseModel):
     width_px: int = 0
     height_px: int = 0
     sha256: str = ""
-    skip_reason: Literal["too_small", "bad_aspect", "duplicate"] | None = None
+    skip_reason: Literal["too_small", "bad_aspect", "duplicate", "vision_disabled"] | None = None
     canonical_image_id: str | None = None
     path: str | None = None
     description: str | None = None
@@ -140,6 +140,21 @@ class PageStat(BaseModel):
     page_class: PageClass | None
     method: Method | None
     duration_s: float
+    reasons: list[str] = Field(default_factory=list)
+
+
+class CallStat(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    kind: Literal["describe_image", "transcribe_page"]
+    id: str
+    model: str
+    latency_s: float
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    estimated: bool
+    cache_hit: bool = False
 
 
 class RunStats(BaseModel):
@@ -159,6 +174,11 @@ class RunStats(BaseModel):
     output_tokens: int = 0
     total_tokens: int = 0
     tokens_estimated: bool = False
+    calls: list[CallStat] = Field(default_factory=list)
+    cache_hits: int = 0
+    cache_misses: int = 0
+    docling_pages: int = 0
+    docling_time_s: float = 0.0
     warnings: list[str] = Field(default_factory=list)
 
     @property

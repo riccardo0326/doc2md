@@ -359,3 +359,37 @@ configuration.
 **Reason:** This makes routing decisions observable and testable without
 loading Docling or calling Kelpie, while preserving the later replaceable hard
 path boundary.
+
+## ADR-027: Phase 6 fast-path representation
+
+**Decision:** Build the pdfplumber fast path from word geometry rather than from
+the flattened `extract_text()` string. Words are grouped into lines, lines into
+paragraphs by vertical gap, and clear two-column pages are read left column then
+right column. A line whose font size is above the configured median ratio becomes
+an inferred heading. Consecutive list lines become one Markdown list block, and
+rectangular tables become GFM pipe tables. Unsupported or ragged tables remain
+on the existing hard-path route.
+
+**Reason:** Geometry is the smallest deterministic seam that can preserve
+reading order and distinguish headings without introducing a layout dependency
+on TEXT pages. Normalisation remains exclusively in `normalize.py`.
+
+## ADR-028: Phase 6 cache and metrics
+
+**Decision:** Use a JSON-only disk cache rooted by source SHA-256. Docling page
+entries and vision image/page entries include their stage, input identity,
+versioned prompt/model, and output-affecting configuration in the key. Cache
+hits restore deterministic content but do not create current-run call records or
+add historical tokens to current-run totals. `--no-cache` disables reads and
+writes for that conversion.
+
+`run.json` derives vision token totals and call counts from the recorded calls;
+missing service usage remains marked `estimated` by the backend. The forced
+`full-vision` and `docling-only` policies reuse the same page loop: the former
+transcribes every rendered page and disables image extraction, while the latter
+uses Docling for every page and saves images without vision calls.
+
+**Reason:** Keeping cache state and operational metrics at adapter boundaries
+prevents stale usage totals and keeps benchmark measurements comparable. The
+Docling adapter continues to reject missing local artifacts unless the explicit
+controlled-development remote-download opt-in is set.

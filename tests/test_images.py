@@ -6,7 +6,7 @@ from pathlib import Path
 import pypdfium2 as pdfium
 
 from doc2md import Config, convert
-from doc2md.config import RouterConfig, VisionConfig
+from doc2md.config import CacheConfig, RouterConfig, VisionConfig
 from doc2md.converters.pdf.images import collect_images, process_images
 from doc2md.vision.fake import FakeVisionBackend
 
@@ -16,6 +16,7 @@ def test_image_stage_filters_deduplicates_and_describes(tmp_path: Path) -> None:
     config = Config(
         router=RouterConfig(complex_image_ratio=1.0),
         vision=VisionConfig(backend="fake", max_workers=1),
+        cache=CacheConfig(dir=str(tmp_path / "cache")),
     )
 
     result = convert(source, tmp_path / "out", config=config)

@@ -8,6 +8,7 @@
 | 3 | Complete | 34 default tests, `inspect`, signals and routing | `phase-3` |
 | 4 | Complete within enterprise perimeter | Docling table/page-range tests; local artifacts required; OCR download skipped by TLS boundary | `phase-4` |
 | 5 | Complete | 40 default tests, FakeVisionBackend, image filtering/dedupe, real Kelpie probe | `phase-5` |
+| 6 | Complete with local-environment exception | FR3 enrichment, three pipelines, JSON cache, no-cache, derived call/token metrics; 46 default tests | `phase-6` |
 
 ## Accepted Constraints
 
@@ -17,5 +18,12 @@
 
 ## Remaining Product Work
 
-- Enrich the pdfplumber fast path with semantic headings, paragraph grouping, lists, and simple GFM tables before benchmark/demo claims.
-- Phase 6: cache, full-vision/docling-only pipelines, and complete metrics.
+- Phase 7: benchmark harness and comparison reports.
+
+## Phase 6 Notes
+
+- The default test suite is green: 46 passed, 1 skipped, 4 deselected.
+- Ruff and strict mypy are green.
+- The targeted slow Docling tests remain blocked on this workstation because the
+  Docling package/artifacts are not available. This preserves the enterprise
+  rule: conversion never downloads Docling/OCR artifacts at runtime.

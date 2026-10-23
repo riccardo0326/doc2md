@@ -26,6 +26,13 @@ class RouterConfig(BaseModel):
     image_page_min_chars: int = 400
 
 
+class FastConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    heading_ratio: float = 1.25
+    column_gutter_min_pt: float = 20.0
+
+
 class HardConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -60,12 +67,21 @@ class VisionConfig(BaseModel):
 
     backend: str = "kelpie"
     max_workers: int = 1
+    page_dpi: int = 150
     max_tokens: int = 800
     temperature: float = 0.0
     timeout_s: float = 120.0
     max_retries: int = 3
     describe_prompt: str = "describe_image.v1"
+    transcribe_prompt: str = "transcribe_page.v1"
     kelpie: KelpieConfig = Field(default_factory=KelpieConfig)
+
+
+class CacheConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    enabled: bool = True
+    dir: str = ".doc2md_cache"
 
 
 class Config(BaseModel):
@@ -73,9 +89,11 @@ class Config(BaseModel):
 
     render: RenderConfig = Field(default_factory=RenderConfig)
     router: RouterConfig = Field(default_factory=RouterConfig)
+    fast: FastConfig = Field(default_factory=FastConfig)
     hard: HardConfig = Field(default_factory=HardConfig)
     images: ImageConfig = Field(default_factory=ImageConfig)
     vision: VisionConfig = Field(default_factory=VisionConfig)
+    cache: CacheConfig = Field(default_factory=CacheConfig)
 
 
 def config_hash(config: Config) -> str:
@@ -92,9 +110,10 @@ def with_overrides(config: Config, overrides: Sequence[str]) -> Config:
         except ValueError as error:
             message = f"invalid override: {override!r}; expected section.key=value"
             raise ValueError(message) from error
-        if section != "router" or not hasattr(config.router, key):
+        section_config = getattr(config, section, None)
+        if section_config is None or not hasattr(section_config, key):
             raise ValueError(f"unknown configuration override: {path}")
-        current = getattr(config.router, key)
+        current = getattr(section_config, key)
         if isinstance(current, bool):
             value: object = raw_value.lower() in {"1", "true", "yes", "on"}
         elif isinstance(current, int):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import sys
 from pathlib import Path
 
@@ -9,6 +10,8 @@ from doc2md import Config, convert
 from doc2md.config import HardConfig, RouterConfig
 from doc2md.converters.pdf.hard import DoclingExtractor
 from doc2md.errors import HardExtractionError
+
+DOC_LING_AVAILABLE = importlib.util.find_spec("docling") is not None
 
 
 def test_docling_adapter_import_is_lazy() -> None:
@@ -34,6 +37,7 @@ def test_default_hard_path_fails_page_without_remote_download() -> None:
 
 
 @pytest.mark.slow
+@pytest.mark.skipif(not DOC_LING_AVAILABLE, reason="Docling optional dependency is not installed")
 def test_docling_extracts_table_blocks() -> None:
     source = Path("tests/fixtures/synthetic/phase1_table.pdf")
     extractor = DoclingExtractor(HardConfig(ocr=False, threads=1, allow_remote_download=True))
@@ -49,6 +53,7 @@ def test_docling_extracts_table_blocks() -> None:
 
 
 @pytest.mark.slow
+@pytest.mark.skipif(not DOC_LING_AVAILABLE, reason="Docling optional dependency is not installed")
 def test_docling_preserves_non_contiguous_original_page_numbers() -> None:
     source = Path("tests/fixtures/synthetic/phase1_text_en.pdf")
     extractor = DoclingExtractor(HardConfig(ocr=False, threads=1, allow_remote_download=True))
@@ -62,6 +67,7 @@ def test_docling_preserves_non_contiguous_original_page_numbers() -> None:
 
 
 @pytest.mark.slow
+@pytest.mark.skipif(not DOC_LING_AVAILABLE, reason="Docling optional dependency is not installed")
 def test_convert_routes_table_to_docling() -> None:
     source = Path("tests/fixtures/synthetic/phase1_table.pdf")
     config = Config(
@@ -76,6 +82,7 @@ def test_convert_routes_table_to_docling() -> None:
 
 
 @pytest.mark.slow
+@pytest.mark.skipif(not DOC_LING_AVAILABLE, reason="Docling optional dependency is not installed")
 def test_docling_ocr_handles_image_only_page() -> None:
     source = Path("tests/fixtures/synthetic/phase1_image_only.pdf")
     extractor = DoclingExtractor(HardConfig(threads=1, allow_remote_download=True))

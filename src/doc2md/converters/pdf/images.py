@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import hashlib
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Literal
 
+from ...cache import DiskCache, vision_cache_key
 from ...config import ImageConfig
 from ...errors import VisionError
 from ...models import ImageBlockDraft, ImageRecord
@@ -36,6 +37,9 @@ class ImageProcessingResult:
     output_tokens: int
     total_tokens: int
     tokens_estimated: bool
+    cache_hits: int = 0
+    cache_misses: int = 0
+    calls: list[tuple[str, VisionResult]] = field(default_factory=list)
 
 
 def _render_crop(pdfium_document: Any, page_number: int, image: dict[str, Any], dpi: int) -> bytes:
@@ -166,6 +170,9 @@ def process_images(
     prompt_id: str,
     max_workers: int,
     output_dir: Path | None,
+    cache: DiskCache | None = None,
+    describe: bool = True,
+    cache_config: object | None = None,
 ) -> ImageProcessingResult:
     records_by_id: dict[str, ImageRecord] = {}
     canonical_candidates = [
@@ -190,28 +197,52 @@ def process_images(
             path = str(asset_path.relative_to(output_dir)).replace("\\", "/")
         paths_by_id[candidate.image_id] = path
 
-    def describe(candidate: ImageCandidate) -> VisionResult:
+    def describe_candidate(candidate: ImageCandidate) -> tuple[VisionResult, bool]:
+        if cache is not None:
+            key = vision_cache_key(
+                candidate.sha256,
+                prompt_id,
+                getattr(backend, "model", "unknown"),
+                cache_config if cache_config is not None else {"max_workers": max_workers},
+            )
+            cached = cache.get("vision-image", key)
+            if cached is not None:
+                return VisionResult.model_validate(cached), True
         result = backend.describe_image(candidate.png or b"", prompt_id=prompt_id)
         if not result.text.strip():
             raise VisionError(f"vision returned an empty description for {candidate.image_id}")
-        return result
+        if cache is not None:
+            cache.put(
+                "vision-image",
+                key,
+                result.model_dump(mode="json"),
+            )
+        return result, False
 
-    descriptions: dict[str, VisionResult | Exception] = {}
-    if canonical_candidates:
+    descriptions: dict[str, tuple[VisionResult, bool] | Exception] = {}
+    cache_hits = cache_misses = 0
+    if canonical_candidates and describe:
         with ThreadPoolExecutor(max_workers=max(1, max_workers)) as executor:
-            futures = {
-                executor.submit(describe, candidate): candidate
+            futures: dict[Future[tuple[VisionResult, bool]], ImageCandidate] = {
+                executor.submit(describe_candidate, candidate): candidate
                 for candidate in canonical_candidates
             }
             for future in as_completed(futures):
                 candidate = futures[future]
                 try:
-                    descriptions[candidate.image_id] = future.result()
+                    description = future.result()
+                    descriptions[candidate.image_id] = description
+                    if description[1]:
+                        cache_hits += 1
+                    else:
+                        cache_misses += 1
                 except Exception as error:  # noqa: BLE001 - image failures are isolated
                     descriptions[candidate.image_id] = error
+                    cache_misses += 1
 
     records: list[ImageRecord] = []
     drafts: list[ImageBlockDraft] = []
+    calls: list[tuple[str, VisionResult]] = []
     input_tokens = output_tokens = total_tokens = 0
     tokens_estimated = False
     for candidate in candidates:
@@ -242,6 +273,18 @@ def process_images(
                 drafts.append(_figure_draft(record, canonical.description))
             continue
 
+        if not describe:
+            record = ImageRecord(
+                status="skipped",
+                skip_reason="vision_disabled",
+                path=paths_by_id[candidate.image_id],
+                **base,
+            )
+            records.append(record)
+            drafts.append(_figure_draft(record, "Vision description disabled for this pipeline."))
+            records_by_id[candidate.image_id] = record
+            continue
+
         result = descriptions[candidate.image_id]
         if isinstance(result, Exception):
             record = ImageRecord(status="failed", path=paths_by_id[candidate.image_id], **base)
@@ -258,17 +301,23 @@ def process_images(
             records_by_id[candidate.image_id] = record
             continue
 
-        usage = result.usage
+        assert not isinstance(result, Exception)
+        vision_result, _cache_hit = result
+        if not _cache_hit:
+            calls.append((candidate.image_id, vision_result))
+        usage = vision_result.usage
         record = ImageRecord(
             status="described",
             path=paths_by_id[candidate.image_id],
-            description=result.text,
+            description=vision_result.text,
             usage=usage,
             **base,
         )
         records.append(record)
         records_by_id[candidate.image_id] = record
-        drafts.append(_figure_draft(record, result.text, data_uris_by_id[candidate.image_id]))
+        drafts.append(
+            _figure_draft(record, vision_result.text, data_uris_by_id[candidate.image_id])
+        )
         input_tokens += usage.input_tokens
         output_tokens += usage.output_tokens
         total_tokens += usage.total_tokens
@@ -282,4 +331,7 @@ def process_images(
         output_tokens=output_tokens,
         total_tokens=total_tokens,
         tokens_estimated=tokens_estimated,
+        cache_hits=cache_hits,
+        cache_misses=cache_misses,
+        calls=calls,
     )
