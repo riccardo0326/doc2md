@@ -11,6 +11,7 @@ import pdfplumber
 
 from .config import Config, config_hash
 from .converters.pdf.fast import extract_page
+from .converters.pdf.hard import DoclingExtractor
 from .converters.pdf.router import classify
 from .converters.pdf.signals import compute_signals
 from .errors import ConfigError, ConversionFailed, SourceError
@@ -77,6 +78,7 @@ def convert(
     page_results: list[PageResult] = []
     page_stats: list[PageStat] = []
     warnings: list[str] = []
+    hard_extractor: DoclingExtractor | None = None
 
     try:
         with pdfplumber.open(str(source_path)) as pdf:
@@ -110,6 +112,7 @@ def convert(
                     continue
 
                 page_started = time.perf_counter()
+                decision = None
                 try:
                     decision = classify(
                         compute_signals(page, effective_config.router),
@@ -125,18 +128,24 @@ def convert(
                             blocks=extract_page(page, page_number),
                         )
                     else:
+                        if hard_extractor is None:
+                            hard_extractor = DoclingExtractor(effective_config.hard)
+                        hard_blocks = hard_extractor.extract(source_path, [page_number])[
+                            page_number
+                        ]
                         result = PageResult(
                             page=page_number,
                             status="ok",
                             page_class=decision.page_class,
-                            method=None,
+                            method="docling",
+                            blocks=hard_blocks,
                             warnings=[f"routed_to_hard_path:{','.join(decision.reasons)}"],
                         )
                 except Exception as error:  # noqa: BLE001 - page failures are isolated
                     result = PageResult(
                         page=page_number,
                         status="failed",
-                        page_class="TEXT",
+                        page_class=decision.page_class if decision is not None else "TEXT",
                         method=None,
                         error=f"{type(error).__name__}: {error}",
                     )

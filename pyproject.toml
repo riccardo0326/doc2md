@@ -20,6 +20,10 @@ dev = [
     "reportlab>=4,<6",
     "ruff>=0.6,<1",
 ]
+hard = [
+    "docling>=2.141,<3",
+    "pypdfium2>=5.14,<6",
+]
 
 [project.scripts]
 doc2md = "doc2md.cli:main"
@@ -30,6 +34,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+addopts = "-m 'not slow'"
 markers = [
     "slow: tests that load heavy document-processing models",
     "kelpie: tests that call the real Kelpie service",

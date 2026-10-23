@@ -26,11 +26,22 @@ class RouterConfig(BaseModel):
     image_page_min_chars: int = 400
 
 
+class HardConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    engine: str = "docling"
+    languages: list[str] = Field(default_factory=lambda: ["en", "de"])
+    threads: int = 4
+    artifacts_path: str | None = None
+    ocr: bool = True
+
+
 class Config(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     render: RenderConfig = Field(default_factory=RenderConfig)
     router: RouterConfig = Field(default_factory=RouterConfig)
+    hard: HardConfig = Field(default_factory=HardConfig)
 
 
 def config_hash(config: Config) -> str:

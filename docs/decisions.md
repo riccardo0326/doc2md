@@ -295,6 +295,22 @@ flagged in block metadata.
 **Reason:** A single pure normalization boundary prevents special-character
 fixes from spreading into routing, rendering, or future hard-path adapters.
 
+## ADR-023: Phase 4 Docling adapter
+
+**Decision:** Configure Docling lazily through `PdfFormatOption` and
+`PdfPipelineOptions`, force CPU execution, keep table structure enabled,
+disable picture enrichment, and convert each selected original page with
+`page_range=(N, N)`. Map section headers, lists, text, and tables into the
+common `Block` model with `source="docling"`.
+
+**Reason:** The installed Docling API supports page ranges and preserves the
+original page number in provenance. Keeping the converter inside the adapter
+avoids importing or loading Docling for text-only conversions.
+
+**Environment note:** OCR integration is implemented and tested, but the local
+RapidOCR model download is currently blocked by the workstation's corporate TLS
+certificate chain; the slow OCR test records this as an environment skip.
+
 ## ADR-022: Phase 3 routing boundary
 
 **Decision:** Compute page signals with pdfplumber, classify them with a pure

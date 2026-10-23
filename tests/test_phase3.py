@@ -4,7 +4,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from doc2md import convert, inspect_pdf
+from doc2md import inspect_pdf
 from doc2md.cli import app
 
 runner = CliRunner()
@@ -26,17 +26,6 @@ def test_inspect_classifies_image_only_fixture() -> None:
     assert len(decisions) == 1
     assert decisions[0].page_class == "SCANNED"
     assert "no_text_layer" in decisions[0].reasons
-
-
-def test_convert_leaves_hard_path_placeholder() -> None:
-    source = Path("tests/fixtures/synthetic/phase1_image_only.pdf")
-
-    result = convert(source)
-
-    assert "<!-- page: 1 -->" in result.markdown
-    assert "routed to hard path (not yet implemented)" in result.markdown
-    assert result.document.pages[0].page_class == "SCANNED"
-    assert result.document.pages[0].method is None
 
 
 def test_inspect_cli_prints_classes_and_accepts_overrides(text_pdf: Path) -> None:
