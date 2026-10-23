@@ -20,6 +20,15 @@ class DoclingExtractor:
     def _get_converter(self) -> Any:
         if self._converter is not None:
             return self._converter
+        if not self.config.artifacts_path and not self.config.allow_remote_download:
+            raise HardExtractionError(
+                "Docling artifacts are not provisioned locally; set hard.artifacts_path "
+                "or explicitly enable remote downloads for controlled development only."
+            )
+        if self.config.artifacts_path and not Path(self.config.artifacts_path).is_dir():
+            raise HardExtractionError(
+                f"Docling artifacts path does not exist: {self.config.artifacts_path}"
+            )
         try:
             from docling.datamodel.accelerator_options import AcceleratorOptions
             from docling.datamodel.base_models import InputFormat

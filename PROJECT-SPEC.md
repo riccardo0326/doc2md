@@ -84,6 +84,7 @@ print(result.markdown_path, result.stats.vision_tokens_total)
 - Sample PDFs from Oz/Hannes and all outputs are confidential. They live in `samples/` and `out/`, both in `.gitignore`.
 - Tests use only **synthetic PDFs generated in code** or public-domain PDFs committed deliberately as small fixtures.
 - Disable third-party telemetry (`HF_HUB_DISABLE_TELEMETRY=1`, `DO_NOT_TRACK=1`); no network calls except package/model download (Phase 0/4) and Kelpie.
+- Enterprise runtime machines must not depend on external model downloads at conversion time. Heavy model artifacts used by Docling must be provisioned locally; an unavailable artifact is an isolated hard-page failure, not a reason to disable TLS or abort the document.
 - Benchmark reports shared with stakeholders contain metrics and short anonymised excerpts only, unless the human says otherwise.
 
 ### 5.3 Licensing
@@ -135,7 +136,7 @@ Each phase ends with: tests green, `ruff` + `mypy`/`pyright` clean, `docs/decisi
 Produce `docs/discovery.md` answering every item below with evidence (command output, short notes). **The agent stops here for human sign-off.**
 
 - [ ] Python version, `uv`/`pip` availability, Windows vs Linux, CPU cores, RAM.
-- [ ] Install `pdfplumber`, `docling`, `pypdfium2`; confirm Docling downloads its models on CPU and converts a 2-page PDF; note time per page and RAM. Record installed versions. Check that the Docling API used in `ARCHITECTURE.md` (§6.3) exists in the installed version; if not, record the real API.
+- [ ] Install `pdfplumber`, `docling`, `pypdfium2`; verify the Docling API on CPU with locally provisioned artifacts. Runtime model downloads are not an enterprise prerequisite; record missing-artifact/TLS limitations, time per page, RAM, and installed versions.
 - [ ] **Kelpie discovery — from the existing reference implementation.** An EDAG project that already integrates Kelpie is checked out locally at `C:\Users\rp99480\dev\ai4tc_webapp` (outside this repo). Treat it as **read-only reference**: never modify it, never commit anything from it, never copy secrets/`.env` values. The agent must:
   1. Locate the Kelpie client code (search for `kelpie` case-insensitively in source, config, docs and env templates) and summarise in `docs/discovery.md`: file paths, how it is called (HTTP OpenAI-compatible, proprietary REST, or SDK), base URL and auth mechanism (names of env vars/config keys only, **no values**), how models are selected, request/response shape for text and for **image + text** inputs, whether and where **token usage** is returned, timeouts/retries/rate-limit handling, max image size.
   2. List the models the project uses or configures, and mark which are **vision-capable and locally hosted**.
@@ -172,7 +173,7 @@ Acceptance: `docs/discovery.md` complete; human replies "go".
 - Demo: `doc2md inspect` on a mixed fixture shows 3 different classes.
 
 ### Phase 4 — Hard path with Docling
-- `DoclingExtractor` converts **only the routed pages** (page range or sub-PDF; see ARCHITECTURE §6.3), CPU, OCR `en+de`, table structure on, Docling's own picture description **off** (we do images ourselves).
+- `DoclingExtractor` converts **only the routed pages** (page range or sub-PDF; see ARCHITECTURE §6.3), CPU, OCR `en+de` when local OCR artifacts are provisioned, table structure on, Docling's own picture description **off** (we do images ourselves). Runtime model downloads are disabled by default; missing artifacts fail only the affected page with a clear provisioning message.
 - Docling output mapped into the common `Block` model with `source="docling"` and correct page numbers (original page numbers, not sub-PDF numbers).
 - Lazy import; single converter instance per run; page results cached.
 - Acceptance: a synthetic scanned page yields its text; a table fixture yields a Markdown table with the right cell count; `import doc2md` + converting a text-only PDF does not import `docling` (test via `sys.modules`); page numbers in JSON equal original page numbers for non-contiguous routed pages (e.g. pages 2 and 5).
@@ -256,6 +257,7 @@ Timeline expectation from the call: Riccardo estimated **about one week** for a 
 | A7 | Project/package name | **Closed: `doc2md`** (project folder `doc2md`) | — |
 | A8 | Whether the vision model and judge model are the same | Same unless Phase 0 shows a better local option | Phase 0 |
 | A9 | Whether benchmark excerpts may be shared outside the team | No: metrics and anonymised excerpts only | Oz/Hannes |
+| A10 | Whether Docling model artifacts may be downloaded at runtime | No: provision local artifacts; remote download is development/provisioning-only | Phase 0/4 |
 
 ## 11. Glossary
 

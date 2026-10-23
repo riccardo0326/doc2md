@@ -311,6 +311,20 @@ avoids importing or loading Docling for text-only conversions.
 RapidOCR model download is currently blocked by the workstation's corporate TLS
 certificate chain; the slow OCR test records this as an environment skip.
 
+## ADR-024: Enterprise Docling artifact boundary
+
+**Decision:** Runtime Docling model downloads are outside the enterprise
+product perimeter. `DoclingExtractor` requires a local `hard.artifacts_path` by
+default; remote downloads are available only through an explicit
+`allow_remote_download=true` setting for controlled development or provisioning.
+Missing local artifacts fail the affected hard page without aborting the
+document. OCR for scanned pages is not a guaranteed capability until OCR
+artifacts are provisioned locally.
+
+**Reason:** The target corporate machines reject the model-download TLS chain
+and do not have a local Tesseract alternative. A production conversion must
+never depend on an unverified external download or silently disable TLS.
+
 ## ADR-022: Phase 3 routing boundary
 
 **Decision:** Compute page signals with pdfplumber, classify them with a pure

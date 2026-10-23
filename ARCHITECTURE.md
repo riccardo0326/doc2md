@@ -367,7 +367,8 @@ class HardExtractor(Protocol):
 
 `DoclingExtractor` rules:
 - `import docling` **inside** `__init__`/first call only (lazy). One `DocumentConverter` instance per `DoclingExtractor`, created on first use, reused for all pages of the run (and across documents if the same `RunContext` is reused by the benchmark).
-- Pipeline options: OCR enabled with languages `en`, `de`; table structure enabled; **picture description/classification off**; accelerator = CPU with `num_threads = cfg.hard.threads`; model artifacts from default HF cache or `cfg.hard.artifacts_path` if set.
+- Pipeline options: OCR enabled with languages `en`, `de` when local OCR artifacts are available; table structure enabled; **picture description/classification off**; accelerator = CPU with `num_threads = cfg.hard.threads`; model artifacts must come from `cfg.hard.artifacts_path` in enterprise runtime. Remote downloads require an explicit development-only opt-in.
+- If local artifacts are not configured or do not exist, raise `HardExtractionError` before initializing the pipeline. The converter records the affected page as failed and continues; it never disables TLS verification or silently downloads models.
 - Page selection: preferred is Docling's page-range option of `convert(...)`; if unavailable in the installed version, create a temporary sub-PDF containing only routed pages (pypdfium2 `import_pages`) and keep a `sub_index -> original_page` map. Whichever is used, **map back to original page numbers**. Phase 0 records which one works.
 - Batch all routed pages of a document in **one** call where contiguous ranges allow, to amortise overhead; otherwise one call per contiguous range.
 - Map Docling items to `Block`: section headers → `heading` (level from Docling), text → `paragraph`, list items → `list`, tables → `table` (Markdown via Docling table export, `meta` holds rows/cols), pictures → handled by the image stage (no `figure` block created here, to avoid double work). `Provenance.source="docling"`, `bbox` copied if available.
@@ -537,7 +538,8 @@ column_gutter_min_pt = 20
 engine = "docling"
 languages = ["en", "de"]
 threads = 4
-artifacts_path = ""            # empty = default HF cache
+artifacts_path = ""            # enterprise runtime requires a local artifact directory
+allow_remote_download = false  # development/provisioning only; never the product default
 
 [images]
 enabled = true
@@ -586,7 +588,7 @@ Exception hierarchy (`errors.py`): `Doc2MdError` ← `ConfigError`, `Unsupported
 |-----------|-----------|
 | File missing/unreadable/encrypted | `SourceError`, exit 1 (encrypted: message says password unsupported in v1) |
 | One page fails in fast or hard path | page `failed`, placeholder in Markdown, continue; warning in `run.json` |
-| Docling not installed but a page needs it | `HardExtractionError` for those pages with a clear install hint (`pip install doc2md[hard]`); pages still marked failed, others continue |
+| Docling not installed or local artifacts unavailable but a page needs it | `HardExtractionError` for those pages with a clear install/provisioning hint; pages still marked failed, others continue |
 | Kelpie unreachable | image stage: images marked `failed`, document completes, warning; `full-vision` pipeline: exit 4 |
 | Kelpie transient error | retry with backoff; then failed record |
 | Invalid config | `ConfigError`, exit 2, message names the key |

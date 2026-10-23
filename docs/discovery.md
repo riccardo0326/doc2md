@@ -18,7 +18,8 @@ is sent as base64 data URLs.
 
 Phase 0 is signed off with the documented A3 sample exception. Phases 1 and 2
 are complete; the remaining real-document requirement applies before benchmark
-work.
+work. Docling hard-path artifacts are an enterprise provisioning prerequisite,
+not a runtime download.
 
 ## Environment
 
@@ -39,6 +40,10 @@ machine if those are different.
 The Phase 0 packages were installed into the temporary environment
 `C:\Users\rp99480\AppData\Local\Temp\opencode\doc2md-phase0-venv`; the
 repository was not modified by that installation.
+
+`tesseract` is not installed on this workstation. The enterprise hard path
+therefore requires pre-provisioned Docling artifacts; runtime OCR/model
+downloads are outside the supported conversion perimeter.
 
 ## PDF And Docling
 

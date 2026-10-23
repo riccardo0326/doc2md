@@ -15,10 +15,28 @@ def test_docling_adapter_import_is_lazy() -> None:
     assert "docling" not in sys.modules
 
 
+def test_docling_requires_local_artifacts_by_default() -> None:
+    source = Path("tests/fixtures/synthetic/phase1_table.pdf")
+
+    with pytest.raises(HardExtractionError, match="artifacts"):
+        DoclingExtractor().extract(source, [1])
+
+
+def test_default_hard_path_fails_page_without_remote_download() -> None:
+    source = Path("tests/fixtures/synthetic/phase1_image_only.pdf")
+
+    result = convert(source)
+
+    page = result.document.pages[0]
+    assert page.status == "failed"
+    assert page.error is not None
+    assert "artifacts" in page.error.lower()
+
+
 @pytest.mark.slow
 def test_docling_extracts_table_blocks() -> None:
     source = Path("tests/fixtures/synthetic/phase1_table.pdf")
-    extractor = DoclingExtractor(HardConfig(ocr=False, threads=1))
+    extractor = DoclingExtractor(HardConfig(ocr=False, threads=1, allow_remote_download=True))
 
     blocks = extractor.extract(source, [1])[1]
 
@@ -33,7 +51,7 @@ def test_docling_extracts_table_blocks() -> None:
 @pytest.mark.slow
 def test_docling_preserves_non_contiguous_original_page_numbers() -> None:
     source = Path("tests/fixtures/synthetic/phase1_text_en.pdf")
-    extractor = DoclingExtractor(HardConfig(ocr=False, threads=1))
+    extractor = DoclingExtractor(HardConfig(ocr=False, threads=1, allow_remote_download=True))
 
     blocks_by_page = extractor.extract(source, [1, 3])
 
@@ -48,7 +66,7 @@ def test_convert_routes_table_to_docling() -> None:
     source = Path("tests/fixtures/synthetic/phase1_table.pdf")
     config = Config(
         router=RouterConfig(complex_image_ratio=0.0, image_page_min_chars=1000),
-        hard=HardConfig(ocr=False, threads=1),
+        hard=HardConfig(ocr=False, threads=1, allow_remote_download=True),
     )
 
     result = convert(source, config=config)
@@ -60,7 +78,7 @@ def test_convert_routes_table_to_docling() -> None:
 @pytest.mark.slow
 def test_docling_ocr_handles_image_only_page() -> None:
     source = Path("tests/fixtures/synthetic/phase1_image_only.pdf")
-    extractor = DoclingExtractor(HardConfig(threads=1))
+    extractor = DoclingExtractor(HardConfig(threads=1, allow_remote_download=True))
 
     try:
         blocks = extractor.extract(source, [1])[1]

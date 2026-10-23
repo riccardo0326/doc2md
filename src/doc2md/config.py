@@ -34,6 +34,7 @@ class HardConfig(BaseModel):
     threads: int = 4
     artifacts_path: str | None = None
     ocr: bool = True
+    allow_remote_download: bool = False
 
 
 class Config(BaseModel):
