@@ -213,10 +213,10 @@ Acceptance: `docs/discovery.md` complete; human replies "go".
 - Demo: generate a review sheet from fixture run outputs.
 
 ### Phase 9 — Findings and packaging
-- Run the real benchmark on the Oz/Hannes sample set (human present for manual scoring).
-- `docs/FINDINGS.md`: method, results tables, charts (optional), **recommendation vs go/no-go criteria (section 8)**, risks, what to do next (e.g. add docx/xlsx/eml converters, bounding boxes, image classifier).
+- Run the benchmark on the complete local corpus: all permitted PDFs in `samples/`, all committed synthetic PDFs used by the test suite, and every PDF discovered under the read-only cloned reference repository `C:\Users\rp99480\dev\ai4tc_webapp` when present. The real EDAG OCR baseline is explicitly **out of scope** for this phase; compare `tiered` with `full-vision` and leave an integration seam for a parallel manual comparison with the existing OCR software.
+- `docs/FINDINGS.md`: method, corpus manifest, results tables, charts (optional), **recommendation vs go/no-go criteria (section 8)** adapted to the available comparisons, explicit baseline exclusion, risks, and what to do next (e.g. add the EDAG adapter, docx/xlsx/eml converters, bounding boxes, image classifier).
 - Packaging: `pyproject.toml` with extras `[hard]` (docling) and `[bench]`; `README.md` (install, usage, library API); `THIRD_PARTY_NOTICES.md`; version `0.1.0`.
-- Acceptance: fresh virtualenv `pip install .[hard,bench]` works; README examples run; FINDINGS cites the exact run directory and versions used.
+- Acceptance: fresh virtualenv `pip install .[hard,bench]` works; README examples run; the corpus discovery command is deterministic and does not copy confidential PDFs; FINDINGS cites the exact run directory and versions used, or clearly records an environment block when Kelpie/Docling artifacts or external PDFs are unavailable.
 
 ## 8. Success criteria and go/no-go (proposed values only — to be reviewed by Riccardo, then confirmed with Amro and Oz before Phase 9)
 

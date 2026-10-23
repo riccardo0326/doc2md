@@ -427,3 +427,20 @@ judge means separate and states the local-model/style-bias limitation.
 
 **Reason:** Reviewers must not be primed by pipeline names, and a faulty judge
 response must never invalidate the rest of a quality run.
+
+## ADR-031: Phase 9 corpus and baseline scope
+
+**Decision:** The Phase 9 benchmark corpus is assembled from permitted local
+PDFs, committed synthetic fixtures, and every PDF discovered beneath the
+read-only reference repository `C:\Users\rp99480\dev\ai4tc_webapp` when such
+files are provisioned. Discovery records paths and SHA-256 values without
+copying PDF bytes into this repository.
+
+The real EDAG OCR software is explicitly outside the Phase 9 implementation and
+acceptance gate. Phase 9 compares `tiered` against `full-vision`; the human may
+run the existing OCR software in parallel against the same corpus. A future
+adapter can be added when its invocation and token reporting are available.
+
+**Reason:** This preserves confidentiality and keeps the final deliverable
+useful now, while avoiding invented claims about an unavailable external
+baseline.
