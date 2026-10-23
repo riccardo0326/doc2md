@@ -11,16 +11,18 @@
 | 6 | Complete with local-environment exception | FR3 enrichment, three pipelines, JSON cache, no-cache, derived call/token metrics; 46 default tests | `phase-6` |
 | 7 | Complete with baseline exception | Benchmark suite loader, cold-cache runner, exact results CSV, deterministic report; 50 default tests | `phase-7` |
 | 8 | Complete with environment exceptions | Stratified blind review, rubric, tolerant judge parser, merged quality report; 54 default tests | `phase-8` |
+| 9 | Complete with baseline and runtime environment exceptions | Corpus discovery, 13-PDF offline benchmark smoke run, findings, packaging, and release documentation; 56 default tests | `phase-9` |
 
 ## Accepted Constraints
 
-- Four additional real documents are still needed before benchmark work.
+- The current corpus includes every provisioned local sample and committed
+  synthetic PDF; the cloned reference repository currently contributes no PDFs.
 - Docling/OCR artifacts must be provisioned locally; runtime downloads are outside the product perimeter.
 - Scanned OCR is unavailable until those local artifacts are provisioned.
 
 ## Remaining Product Work
 
-- Phase 9: real findings, packaging, and release documentation.
+- Phase 9: final findings, packaging, and release documentation.
 
 ## Phase 6 Notes
 
@@ -43,3 +45,13 @@
   fake backends.
 - Real Kelpie scoring and real-document review remain environment/stakeholder
   work; no confidential samples or model responses are committed.
+
+## Phase 9 Scope Notes
+
+- The real EDAG OCR baseline is intentionally excluded from Phase 9 and will be
+  tested in parallel by the human using the same discovered PDF corpus.
+- The cloned reference repository currently contains no PDF files; discovery
+  remains dynamic so later provisioned PDFs are included without copying them.
+- Offline benchmark smoke run: `bench_runs/phase9-corpus/20261023-133515/`.
+- Packaging wheel build passed; real Kelpie/Docling quality measurements remain
+  environment-dependent and are not claimed by the offline smoke results.

@@ -1,17 +1,37 @@
 [suite]
-name = "oz-hannes-sample-v1"
-repetitions = 3
+name = "phase9-local-corpus-v1"
+repetitions = 1
 cold_cache = true
 
 [[documents]]
-id = "doc01"
-path = "samples/doc01.pdf"
+id = "synthetic-en"
+path = "../tests/fixtures/synthetic/phase1_text_en.pdf"
 tags = ["digital", "en"]
 
 [[documents]]
-id = "doc02"
-path = "samples/doc02_scan.pdf"
-tags = ["scanned", "de"]
+id = "synthetic-de"
+path = "../tests/fixtures/synthetic/phase1_text_de.pdf"
+tags = ["digital", "de"]
+
+[[documents]]
+id = "synthetic-table"
+path = "../tests/fixtures/synthetic/phase1_table.pdf"
+tags = ["digital", "tables", "en"]
+
+[[documents]]
+id = "synthetic-scanned"
+path = "../tests/fixtures/synthetic/phase1_image_only.pdf"
+tags = ["scanned", "en"]
+
+[[documents]]
+id = "synthetic-ligatures"
+path = "../tests/fixtures/synthetic/phase2_ligatures.pdf"
+tags = ["digital", "en"]
+
+[[documents]]
+id = "synthetic-images"
+path = "../tests/fixtures/synthetic/phase5_embedded_images.pdf"
+tags = ["digital", "figures", "en"]
 
 [[pipelines]]
 name = "tiered"

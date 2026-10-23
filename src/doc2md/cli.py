@@ -6,6 +6,7 @@ import typer
 
 from .api import convert as convert_document
 from .api import inspect_pdf
+from .bench.corpus import discover_pdfs, write_manifest
 from .bench.judge import judge_run
 from .bench.report import write_report
 from .bench.review import write_review_sheet
@@ -105,6 +106,18 @@ def bench_judge_command(
     run_dir: Path = typer.Argument(..., exists=True, file_okay=False),
 ) -> None:
     typer.echo(str(judge_run(run_dir)))
+
+
+@bench_app.command("corpus")
+def bench_corpus_command(
+    external_root: Path | None = typer.Option(None, "--external-root", file_okay=False),
+    output_path: Path = typer.Option(Path("bench_runs/corpus.json"), "--out"),
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    roots: list[Path] = [repo_root / "samples", repo_root / "tests" / "fixtures" / "synthetic"]
+    if external_root is not None:
+        roots.append(external_root)
+    typer.echo(str(write_manifest(discover_pdfs(roots), output_path)))
 
 
 def main() -> None:
