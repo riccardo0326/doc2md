@@ -1,0 +1,23 @@
+[suite]
+name = "oz-hannes-sample-v1"
+repetitions = 3
+cold_cache = true
+
+[[documents]]
+id = "doc01"
+path = "samples/doc01.pdf"
+tags = ["digital", "en"]
+
+[[documents]]
+id = "doc02"
+path = "samples/doc02_scan.pdf"
+tags = ["scanned", "de"]
+
+[[pipelines]]
+name = "tiered"
+
+[[pipelines]]
+name = "full-vision"
+
+[[pipelines]]
+name = "docling-only"

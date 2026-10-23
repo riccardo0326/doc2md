@@ -393,3 +393,21 @@ uses Docling for every page and saves images without vision calls.
 prevents stale usage totals and keeps benchmark measurements comparable. The
 Docling adapter continues to reject missing local artifacts unless the explicit
 controlled-development remote-download opt-in is set.
+
+## ADR-029: Phase 7 benchmark isolation
+
+**Decision:** `bench run` creates a timestamped run directory and a fresh output
+directory for every document/pipeline/repetition. With `cold_cache=true`, each
+repetition receives its own cache directory, so timing and external-call counts
+cannot benefit from an earlier repetition. The suite copy, environment metadata,
+and exact `results.csv` schema are stored beside the outputs.
+
+The harness accepts injected vision, hard-path, and baseline factories for
+offline tests. `baseline_current` is optional; until the external EDAG software
+and invocation are delivered, the fake adapter is the only supported baseline
+implementation. Reports use deterministic pipeline ordering and median wall
+time across repetitions.
+
+**Reason:** Benchmark results must be reproducible without leaking confidential
+documents or pretending that the unavailable current system has measured token
+usage.

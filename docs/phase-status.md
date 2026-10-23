@@ -9,6 +9,7 @@
 | 4 | Complete within enterprise perimeter | Docling table/page-range tests; local artifacts required; OCR download skipped by TLS boundary | `phase-4` |
 | 5 | Complete | 40 default tests, FakeVisionBackend, image filtering/dedupe, real Kelpie probe | `phase-5` |
 | 6 | Complete with local-environment exception | FR3 enrichment, three pipelines, JSON cache, no-cache, derived call/token metrics; 46 default tests | `phase-6` |
+| 7 | Complete with baseline exception | Benchmark suite loader, cold-cache runner, exact results CSV, deterministic report; 50 default tests | `phase-7` |
 
 ## Accepted Constraints
 
@@ -18,7 +19,7 @@
 
 ## Remaining Product Work
 
-- Phase 7: benchmark harness and comparison reports.
+- Phase 8: stratified manual review and Kelpie judge.
 
 ## Phase 6 Notes
 
@@ -27,3 +28,10 @@
 - The targeted slow Docling tests remain blocked on this workstation because the
   Docling package/artifacts are not available. This preserves the enterprise
   rule: conversion never downloads Docling/OCR artifacts at runtime.
+
+## Phase 7 Notes
+
+- The benchmark harness runs synthetic suites without confidential samples or a
+  current-system adapter; default QA is 50 passed, 1 skipped, 4 deselected.
+- `baseline_current` remains optional and uses an explicit fake adapter in tests;
+  the real EDAG adapter is still blocked on delivery of that software.

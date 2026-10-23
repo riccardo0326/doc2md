@@ -6,9 +6,13 @@ import typer
 
 from .api import convert as convert_document
 from .api import inspect_pdf
+from .bench.report import write_report
+from .bench.runner import run_benchmark
 from .config import Config, with_overrides
 
 app = typer.Typer(help="Convert PDF documents to provenance-rich Markdown.")
+bench_app = typer.Typer(help="Run benchmark suites and build reports.")
+app.add_typer(bench_app, name="bench")
 
 
 @app.callback()
@@ -58,6 +62,30 @@ def inspect_command(
             f"{signals.garbled_ratio:.3f} {decision.page_class} "
             f"{','.join(decision.reasons)}"
         )
+
+
+@bench_app.command("run")
+def bench_run_command(
+    suite: Path = typer.Option(..., "--suite", exists=True, readable=True),
+    pipelines: str | None = typer.Option(None, "--pipelines"),
+    repetitions: int | None = typer.Option(None, "--reps", min=1),
+    output_dir: Path = typer.Option(Path("bench_runs"), "--out", file_okay=False),
+) -> None:
+    selected = pipelines.split(",") if pipelines else None
+    run_dir = run_benchmark(
+        suite,
+        output_dir=output_dir,
+        pipelines=selected,
+        repetitions=repetitions,
+    )
+    typer.echo(str(run_dir))
+
+
+@bench_app.command("report")
+def bench_report_command(
+    run_dir: Path = typer.Argument(..., exists=True, file_okay=False),
+) -> None:
+    typer.echo(str(write_report(run_dir)))
 
 
 def main() -> None:
