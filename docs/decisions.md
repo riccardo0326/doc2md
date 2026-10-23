@@ -323,6 +323,17 @@ artifact hash.
 depending on remote services. The image stage can therefore be tested fully
 offline and the real proxy integration remains a replaceable adapter.
 
+## ADR-026: Fast-path Markdown enrichment remains pending
+
+**Decision:** Treat the current line-oriented Markdown as the Phase 1 walking
+skeleton only. Before benchmark or final demo claims, enrich the pdfplumber fast
+path with semantic headings, paragraph grouping, lists, and simple GFM tables as
+required by FR3.
+
+**Reason:** The current output is valid Markdown with provenance, but it is not
+yet a semantically rich document representation. This is product work distinct
+from the completed Phase 5 image/vision pipeline.
+
 ## ADR-024: Enterprise Docling artifact boundary
 
 **Decision:** Runtime Docling model downloads are outside the enterprise
