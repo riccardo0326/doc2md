@@ -149,11 +149,12 @@ def _baseline_row(
     }
 
 
-def _write_environment(path: Path, config: Config) -> None:
+def _write_environment(path: Path, config: Config, suite: BenchmarkSuite) -> None:
     payload = {
         "python": sys.version.split()[0],
         "platform": platform.platform(),
         "config_hash": __import__("doc2md.config", fromlist=["config_hash"]).config_hash(config),
+        "documents": {document.id: str(document.path) for document in suite.documents},
     }
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
@@ -185,7 +186,7 @@ def run_benchmark(
     (run_dir / "outputs").mkdir()
     if suite_path is not None:
         shutil.copyfile(suite_path, run_dir / "suite.toml")
-    _write_environment(run_dir / "env.json", effective_config)
+    _write_environment(run_dir / "env.json", effective_config, loaded)
     rows: list[dict[str, object]] = []
 
     for document in loaded.documents:

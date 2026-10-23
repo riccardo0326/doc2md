@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import json
 from collections import defaultdict
 from pathlib import Path
 from statistics import median
@@ -73,7 +74,94 @@ def render_report(results_path: str | Path) -> str:
                 continue
             savings = (token_totals[baseline] - token_totals[pipeline]) / token_totals[baseline]
             lines.append(f"| {pipeline} | {baseline} | {savings:.1%} |")
-    lines.extend(["", "## Notes", "", "- Results are grouped from the recorded repetitions.", ""])
+    lines.extend(["", "## Notes", "", "- Results are grouped from the recorded repetitions."])
+    judge_path = Path(results_path).parent / "scores_judge.json"
+    if judge_path.is_file():
+        records = json.loads(judge_path.read_text(encoding="utf-8"))
+        mapping_path = Path(results_path).parent / "review" / "unblind_map.json"
+        mapping = (
+            json.loads(mapping_path.read_text(encoding="utf-8")) if mapping_path.is_file() else {}
+        )
+        totals: dict[str, dict[str, list[int]]] = defaultdict(lambda: defaultdict(list))
+        for record in records:
+            scores = record.get("scores", {})
+            pipeline = mapping.get(record.get("sample_id"), {}).get(record.get("label"))
+            if not pipeline or record.get("judge_error"):
+                continue
+            for criterion, score in scores.items():
+                if isinstance(score, int):
+                    totals[pipeline][criterion].append(score)
+        lines.extend(
+            [
+                "",
+                "## Quality Scores",
+                "",
+                "Judge scores use the local model and may reflect model/style bias.",
+                "",
+                "| Pipeline | Text | Special chars | Tables | Figures | Order |",
+                "|---|---:|---:|---:|---:|---:|",
+            ]
+        )
+        for pipeline in sorted(totals):
+            quality_values = totals[pipeline]
+            means = {
+                criterion: sum(scores) / len(scores) if scores else 0.0
+                for criterion, scores in quality_values.items()
+            }
+            lines.append(
+                f"| {pipeline} | {means.get('text_fidelity', 0):.2f} | "
+                f"{means.get('special_characters', 0):.2f} | "
+                f"{means.get('table_fidelity', 0):.2f} | "
+                f"{means.get('figure_usefulness', 0):.2f} | "
+                f"{means.get('reading_order', 0):.2f} |"
+            )
+    manual_paths = (
+        Path(results_path).parent / "scores_manual.csv",
+        Path(results_path).parent / "review" / "review_sheet.csv",
+    )
+    manual_path = next((path for path in manual_paths if path.is_file()), None)
+    mapping_path = Path(results_path).parent / "review" / "unblind_map.json"
+    if manual_path is not None and mapping_path.is_file():
+        mapping = json.loads(mapping_path.read_text(encoding="utf-8"))
+        manual_totals: dict[str, dict[str, list[int]]] = defaultdict(lambda: defaultdict(list))
+        criteria = {
+            "text": "text_fidelity",
+            "special": "special_characters",
+            "table": "table_fidelity",
+            "figure": "figure_usefulness",
+            "order": "reading_order",
+        }
+        with manual_path.open(newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                for label, pipeline in mapping.get(row.get("sample_id", ""), {}).items():
+                    for prefix, criterion in criteria.items():
+                        raw = row.get(f"{prefix}_{label}_score", "")
+                        if raw in {"0", "1", "2"}:
+                            manual_totals[pipeline][criterion].append(int(raw))
+        if manual_totals:
+            lines.extend(
+                [
+                    "",
+                    "## Manual Quality Scores",
+                    "",
+                    "| Pipeline | Text | Special chars | Tables | Figures | Order |",
+                    "|---|---:|---:|---:|---:|---:|",
+                ]
+            )
+            for pipeline in sorted(manual_totals):
+                manual_values = manual_totals[pipeline]
+                means = {
+                    criterion: sum(scores) / len(scores) if scores else 0.0
+                    for criterion, scores in manual_values.items()
+                }
+                lines.append(
+                    f"| {pipeline} | {means.get('text_fidelity', 0):.2f} | "
+                    f"{means.get('special_characters', 0):.2f} | "
+                    f"{means.get('table_fidelity', 0):.2f} | "
+                    f"{means.get('figure_usefulness', 0):.2f} | "
+                    f"{means.get('reading_order', 0):.2f} |"
+                )
+    lines.append("")
     return "\n".join(lines)
 
 

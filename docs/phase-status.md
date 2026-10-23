@@ -10,6 +10,7 @@
 | 5 | Complete | 40 default tests, FakeVisionBackend, image filtering/dedupe, real Kelpie probe | `phase-5` |
 | 6 | Complete with local-environment exception | FR3 enrichment, three pipelines, JSON cache, no-cache, derived call/token metrics; 46 default tests | `phase-6` |
 | 7 | Complete with baseline exception | Benchmark suite loader, cold-cache runner, exact results CSV, deterministic report; 50 default tests | `phase-7` |
+| 8 | Complete with environment exceptions | Stratified blind review, rubric, tolerant judge parser, merged quality report; 54 default tests | `phase-8` |
 
 ## Accepted Constraints
 
@@ -19,7 +20,7 @@
 
 ## Remaining Product Work
 
-- Phase 8: stratified manual review and Kelpie judge.
+- Phase 9: real findings, packaging, and release documentation.
 
 ## Phase 6 Notes
 
@@ -35,3 +36,10 @@
   current-system adapter; default QA is 50 passed, 1 skipped, 4 deselected.
 - `baseline_current` remains optional and uses an explicit fake adapter in tests;
   the real EDAG adapter is still blocked on delivery of that software.
+
+## Phase 8 Notes
+
+- Review sampling and judge parsing are fully tested offline with deterministic
+  fake backends.
+- Real Kelpie scoring and real-document review remain environment/stakeholder
+  work; no confidential samples or model responses are committed.

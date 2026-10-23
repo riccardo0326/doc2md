@@ -6,7 +6,9 @@ import typer
 
 from .api import convert as convert_document
 from .api import inspect_pdf
+from .bench.judge import judge_run
 from .bench.report import write_report
+from .bench.review import write_review_sheet
 from .bench.runner import run_benchmark
 from .config import Config, with_overrides
 
@@ -86,6 +88,23 @@ def bench_report_command(
     run_dir: Path = typer.Argument(..., exists=True, file_okay=False),
 ) -> None:
     typer.echo(str(write_report(run_dir)))
+
+
+@bench_app.command("review-sheet")
+def bench_review_sheet_command(
+    run_dir: Path = typer.Argument(..., exists=True, file_okay=False),
+    sample_size: int = typer.Option(30, "--n", min=1),
+    seed: int = typer.Option(42, "--seed"),
+) -> None:
+    paths = write_review_sheet(run_dir, n=sample_size, seed=seed)
+    typer.echo(str(paths.csv_path))
+
+
+@bench_app.command("judge")
+def bench_judge_command(
+    run_dir: Path = typer.Argument(..., exists=True, file_okay=False),
+) -> None:
+    typer.echo(str(judge_run(run_dir)))
 
 
 def main() -> None:

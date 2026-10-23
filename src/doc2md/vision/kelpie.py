@@ -105,6 +105,33 @@ class KelpieVisionBackend:
                 time.sleep(delay)
         raise VisionError("Kelpie retry loop exhausted")
 
+    def complete(self, prompt: str, *, image_png: bytes | None = None) -> VisionResult:
+        content: list[dict[str, str]] = [{"type": "input_text", "text": prompt}]
+        if image_png is not None:
+            encoded = base64.b64encode(image_png).decode("ascii")
+            content.append(
+                {
+                    "type": "input_image",
+                    "image_url": f"data:image/png;base64,{encoded}",
+                }
+            )
+        started = time.perf_counter()
+        response = self._call(
+            lambda: self._get_client().responses.create(
+                model=self.model,
+                input=[{"role": "user", "content": content}],
+                max_output_tokens=self.config.max_tokens,
+                store=False,
+            )
+        )
+        return VisionResult(
+            text=str(getattr(response, "output_text", "") or ""),
+            usage=self._usage(response),
+            model=self.model,
+            latency_s=time.perf_counter() - started,
+            request_id=getattr(response, "id", None),
+        )
+
     def describe_image(
         self, image_png: bytes, *, prompt_id: str, lang: str = "auto"
     ) -> VisionResult:

@@ -411,3 +411,19 @@ time across repetitions.
 **Reason:** Benchmark results must be reproducible without leaking confidential
 documents or pretending that the unavailable current system has measured token
 usage.
+
+## ADR-030: Phase 8 blind quality evaluation
+
+**Decision:** Select review pages from the tiered run using a fixed seed and
+stratify across `TEXT`, `COMPLEX`, and `SCANNED` classes, capped at ten pages
+per class when available. Candidate pipelines are shuffled into opaque labels
+per sample; the label-to-pipeline mapping is stored separately in
+`review/unblind_map.json`.
+
+The judge accepts only the five rubric scores in the range 0–2. It extracts the
+first JSON object from a response, tolerates fenced JSON, and records malformed
+responses as `judge_error` without aborting the run. The report keeps manual and
+judge means separate and states the local-model/style-bias limitation.
+
+**Reason:** Reviewers must not be primed by pipeline names, and a faulty judge
+response must never invalidate the rest of a quality run.
