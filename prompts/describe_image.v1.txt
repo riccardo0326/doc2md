@@ -1,0 +1,5 @@
+Describe the image for a downstream document-to-Markdown pipeline.
+
+Return one concise factual paragraph. Mention visible text, objects, diagrams,
+tables, charts, and relationships that matter for understanding the document.
+Do not invent details. Do not use Markdown headings or JSON.

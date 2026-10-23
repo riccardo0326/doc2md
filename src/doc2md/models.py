@@ -88,12 +88,25 @@ class ImageRecord(BaseModel):
     image_id: str
     page: int
     status: Literal["described", "skipped", "failed"]
+    bbox: dict[str, float] | None = None
     width_px: int = 0
     height_px: int = 0
     sha256: str = ""
+    skip_reason: Literal["too_small", "bad_aspect", "duplicate"] | None = None
+    canonical_image_id: str | None = None
     path: str | None = None
     description: str | None = None
     usage: Usage | None = None
+
+
+class ImageBlockDraft(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    image_id: str
+    page: int
+    markdown: str
+    text: str
+    source_path: str | None = None
 
 
 class PageResult(BaseModel):

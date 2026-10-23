@@ -37,12 +37,45 @@ class HardConfig(BaseModel):
     allow_remote_download: bool = False
 
 
+class ImageConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    enabled: bool = True
+    render_dpi: int = 150
+    min_width_px: int = 64
+    min_height_px: int = 64
+    min_area_px: int = 10000
+    max_aspect: float = 8.0
+
+
+class KelpieConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    base_url: str = ""
+    model: str = ""
+
+
+class VisionConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    backend: str = "kelpie"
+    max_workers: int = 1
+    max_tokens: int = 800
+    temperature: float = 0.0
+    timeout_s: float = 120.0
+    max_retries: int = 3
+    describe_prompt: str = "describe_image.v1"
+    kelpie: KelpieConfig = Field(default_factory=KelpieConfig)
+
+
 class Config(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     render: RenderConfig = Field(default_factory=RenderConfig)
     router: RouterConfig = Field(default_factory=RouterConfig)
     hard: HardConfig = Field(default_factory=HardConfig)
+    images: ImageConfig = Field(default_factory=ImageConfig)
+    vision: VisionConfig = Field(default_factory=VisionConfig)
 
 
 def config_hash(config: Config) -> str:

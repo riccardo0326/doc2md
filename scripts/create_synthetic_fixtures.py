@@ -70,6 +70,29 @@ def _image_only_fixture(path: Path) -> None:
     document.save()
 
 
+def _embedded_images_fixture(path: Path) -> None:
+    large = Image.new("RGB", (240, 160), "steelblue")
+    drawing = ImageDraw.Draw(large)
+    drawing.rectangle((10, 10, 230, 150), outline="black", width=5)
+    drawing.ellipse((80, 40, 160, 120), fill="gold", outline="black", width=3)
+    large_buffer = BytesIO()
+    large.save(large_buffer, format="PNG")
+    large_bytes = large_buffer.getvalue()
+
+    small = Image.new("RGB", (16, 16), "gray")
+    small_buffer = BytesIO()
+    small.save(small_buffer, format="PNG")
+
+    document = _new_canvas(path)
+    document.setFont("Helvetica", 12)
+    document.drawString(72, 720, "Embedded image fixture paragraph")
+    document.drawImage(ImageReader(BytesIO(large_bytes)), 72, 430, width=240, height=160)
+    document.drawImage(ImageReader(BytesIO(large_bytes)), 300, 430, width=240, height=160)
+    document.drawImage(ImageReader(BytesIO(small_buffer.getvalue())), 72, 380, width=16, height=16)
+    document.showPage()
+    document.save()
+
+
 def _ligature_fixture(path: Path) -> None:
     font_path = Path(r"C:\Windows\Fonts\arial.ttf")
     if not font_path.is_file():
@@ -100,6 +123,7 @@ def main() -> None:
     )
     _table_fixture(FIXTURE_DIR / "phase1_table.pdf")
     _image_only_fixture(FIXTURE_DIR / "phase1_image_only.pdf")
+    _embedded_images_fixture(FIXTURE_DIR / "phase5_embedded_images.pdf")
     _ligature_fixture(FIXTURE_DIR / "phase2_ligatures.pdf")
     print(FIXTURE_DIR)
 

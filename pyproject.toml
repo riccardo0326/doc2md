@@ -8,6 +8,8 @@ version = "0.1.0"
 description = "Tiered PDF to Markdown converter"
 requires-python = ">=3.11"
 dependencies = [
+    "httpx>=0.28,<1",
+    "openai>=1.109,<2",
     "pdfplumber>=0.11,<1",
     "pydantic>=2,<3",
     "typer>=0.12,<1",

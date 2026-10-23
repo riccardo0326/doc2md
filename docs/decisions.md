@@ -311,6 +311,18 @@ avoids importing or loading Docling for text-only conversions.
 RapidOCR model download is currently blocked by the workstation's corporate TLS
 certificate chain; the slow OCR test records this as an environment skip.
 
+## ADR-025: Phase 5 vision transport and image identity
+
+**Decision:** Use the verified local Kelpie OpenAI-compatible proxy through the
+native OpenAI Responses API. Keep `FakeVisionBackend` as the deterministic test
+edge. Image duplicates are identified from the embedded PDF stream when
+available, while rendered PNG bytes are used for the actual vision request and
+artifact hash.
+
+**Reason:** This matches the Phase 0 evidence without importing LangChain or
+depending on remote services. The image stage can therefore be tested fully
+offline and the real proxy integration remains a replaceable adapter.
+
 ## ADR-024: Enterprise Docling artifact boundary
 
 **Decision:** Runtime Docling model downloads are outside the enterprise

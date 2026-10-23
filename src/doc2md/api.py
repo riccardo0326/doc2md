@@ -12,14 +12,17 @@ import pdfplumber
 from .config import Config, config_hash
 from .converters.pdf.fast import extract_page
 from .converters.pdf.hard import DoclingExtractor
+from .converters.pdf.images import collect_images, process_images
 from .converters.pdf.router import classify
 from .converters.pdf.signals import compute_signals
 from .errors import ConfigError, ConversionFailed, SourceError
 from .models import (
+    Block,
     ConversionResult,
     ConvertedDocument,
     PageResult,
     PageStat,
+    Provenance,
     RouteDecision,
     RunStats,
     SourceInfo,
@@ -27,6 +30,7 @@ from .models import (
 )
 from .render.markdown import render_markdown
 from .render.sidecar import write_document, write_run
+from .vision.factory import build_vision_backend
 
 
 def _sha256(path: Path) -> str:
@@ -79,6 +83,19 @@ def convert(
     page_stats: list[PageStat] = []
     warnings: list[str] = []
     hard_extractor: DoclingExtractor | None = None
+    image_candidates = []
+    seen_image_hashes: dict[str, str] = {}
+    pdfium_document = None
+    destination = Path(out_dir) / source_path.stem if out_dir is not None else None
+    if destination is not None:
+        destination.mkdir(parents=True, exist_ok=True)
+    if effective_config.images.enabled:
+        try:
+            import pypdfium2 as pdfium
+
+            pdfium_document = pdfium.PdfDocument(str(source_path))
+        except Exception as error:  # noqa: BLE001 - image stage is optional
+            warnings.append(f"image source unavailable: {type(error).__name__}: {error}")
 
     try:
         with pdfplumber.open(str(source_path)) as pdf:
@@ -150,6 +167,20 @@ def convert(
                         error=f"{type(error).__name__}: {error}",
                     )
                     warnings.append(f"page {page_number} failed")
+                if (
+                    pdfium_document is not None
+                    and result.status == "ok"
+                    and result.page_class != "SCANNED"
+                ):
+                    image_candidates.extend(
+                        collect_images(
+                            page,
+                            pdfium_document,
+                            page_number,
+                            effective_config.images,
+                            seen_image_hashes,
+                        )
+                    )
                 duration = time.perf_counter() - page_started
                 page_results.append(result)
                 page_stats.append(
@@ -164,6 +195,42 @@ def convert(
     except Exception as error:  # noqa: BLE001 - source failures become SourceError
         raise SourceError(f"unable to read PDF: {error}") from error
 
+    if pdfium_document is not None:
+        pdfium_document.close()
+
+    image_records = []
+    vision_calls = input_tokens = output_tokens = total_tokens = 0
+    tokens_estimated = False
+    if image_candidates:
+        image_result = process_images(
+            image_candidates,
+            build_vision_backend(effective_config.vision),
+            prompt_id=effective_config.vision.describe_prompt,
+            max_workers=effective_config.vision.max_workers,
+            output_dir=destination,
+        )
+        image_records = image_result.records
+        vision_calls = image_result.vision_calls
+        input_tokens = image_result.input_tokens
+        output_tokens = image_result.output_tokens
+        total_tokens = image_result.total_tokens
+        tokens_estimated = image_result.tokens_estimated
+        for draft in image_result.blocks:
+            page_result = page_results[draft.page - 1]
+            if page_result.status == "failed":
+                continue
+            block = Block(
+                block_id=f"p{draft.page:04d}-b{len(page_result.blocks) + 1:03d}",
+                type="figure",
+                markdown=draft.markdown,
+                text=draft.text,
+                provenance=Provenance(page=draft.page, source="vision"),
+                meta={"image_id": draft.image_id},
+            )
+            page_results[draft.page - 1] = page_result.model_copy(
+                update={"blocks": [*page_result.blocks, block]}
+            )
+
     failed_count = sum(result.status == "failed" for result in page_results)
     if strict and failed_count:
         raise ConversionFailed(f"{failed_count} page(s) failed")
@@ -177,6 +244,7 @@ def convert(
         source=source_info,
         pipeline=pipeline,
         pages=page_results,
+        images=image_records,
         tool=tool,
     )
     markdown = render_markdown(
@@ -195,6 +263,11 @@ def convert(
         wall_time_s=time.perf_counter() - started_counter,
         pages=page_stats,
         pages_failed=failed_count,
+        vision_calls=vision_calls,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=total_tokens,
+        tokens_estimated=tokens_estimated,
         warnings=warnings,
     )
 
@@ -202,7 +275,7 @@ def convert(
     json_path: Path | None = None
     run_path: Path | None = None
     if out_dir is not None:
-        destination = Path(out_dir) / source_path.stem
+        assert destination is not None
         destination.mkdir(parents=True, exist_ok=True)
         markdown_path = destination / f"{source_path.stem}.md"
         json_path = destination / f"{source_path.stem}.json"
