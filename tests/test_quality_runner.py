@@ -59,11 +59,13 @@ def test_quality_runner_reports_missing_reference_content(text_pdf: Path, tmp_pa
     assert any("reference token coverage" in error for error in report.errors)
 
 
-def test_quality_runner_distinguishes_intentional_hard_page_failure(tmp_path: Path) -> None:
+def test_quality_runner_distinguishes_kelpie_hard_page_failure(tmp_path: Path) -> None:
     runner = _runner_module()
     source = Path("tests/fixtures/synthetic/phase1_image_only.pdf")
 
-    report = runner.run_quality(source, tmp_path / "out", no_images=True)
+    report = runner.run_quality(
+        source, tmp_path / "out", no_images=True, vision_backend="kelpie"
+    )
 
     assert not report.passed
     assert report.failed_pages == [1]

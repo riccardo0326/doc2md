@@ -13,9 +13,8 @@ pip install .[hard]
 Use `.[dev]` for tests, Ruff, and mypy. The optional `[hard]` extra is for
 disposable development diagnostics only. Enterprise PCs must not install or
 download OCR/layout/model artifacts; supported hard processing uses Kelpie with
-models hosted locally on EDAG servers. Until the Kelpie hard-page path is
-implemented, affected pages are reported as failed or use the eligible text
-fallback.
+models hosted locally on EDAG servers. The default hard model is
+`DARE-NoCloud-Helios`.
 
 ## Convert
 
@@ -44,7 +43,7 @@ print(result.stats.vision_tokens_total)
 ## Token Efficiency
 
 The tiered pipeline avoids vision on ordinary text pages, routes hard pages only
-to the configured hard adapter, deduplicates images, caches descriptions, and records
+to Kelpie/Helios, deduplicates images, caches descriptions, and records
 input/output/total token usage in `run.json`. `full-vision` is the explicit
 comparison baseline. `--no-cache` is available for fair timing.
 

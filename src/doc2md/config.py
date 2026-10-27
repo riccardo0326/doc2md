@@ -38,7 +38,7 @@ class FastConfig(BaseModel):
 class HardConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    engine: str = "docling"
+    engine: str = "kelpie"
     languages: list[str] = Field(default_factory=lambda: ["en", "de"])
     threads: int = 4
     artifacts_path: str | None = None
@@ -62,7 +62,7 @@ class KelpieConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     base_url: str = ""
-    model: str = ""
+    model: str = "DARE-NoCloud-Helios"
 
 
 class VisionConfig(BaseModel):

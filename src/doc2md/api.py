@@ -14,7 +14,7 @@ import pdfplumber
 from .cache import DiskCache, docling_cache_key, vision_cache_key
 from .config import Config, config_hash
 from .converters.pdf.fast import extract_page
-from .converters.pdf.hard import DoclingExtractor
+from .converters.pdf.hard import DoclingExtractor, KelpieHardExtractor
 from .converters.pdf.images import collect_images, process_images
 from .converters.pdf.margins import strip_repeated_margins
 from .converters.pdf.router import classify
@@ -124,13 +124,26 @@ def convert(
     page_results: list[PageResult] = []
     collector = MetricsCollector()
     warnings: list[str] = []
-    hard_extractor = getattr(context, "hard", None) if context is not None else None
-    if hard_extractor is None:
-        hard_extractor = DoclingExtractor(effective_config.hard)
     requires_vision = pipeline == "full-vision" or (
-        pipeline != "docling-only" and effective_config.images.enabled
+        pipeline != "docling-only"
+        and (effective_config.images.enabled or effective_config.hard.engine == "kelpie")
     )
     vision_backend = _backend(context, effective_config, requires_vision)
+    hard_extractor = getattr(context, "hard", None) if context is not None else None
+    if hard_extractor is None:
+        if pipeline != "docling-only" and effective_config.hard.engine == "kelpie":
+            if vision_backend is None:
+                raise ConfigError("Kelpie hard path requires a vision backend")
+            hard_extractor = KelpieHardExtractor(
+                vision_backend,
+                page_dpi=effective_config.vision.page_dpi,
+                prompt_id=effective_config.vision.transcribe_prompt,
+            )
+        else:
+            development_config = effective_config.hard.model_copy(
+                update={"engine": "docling-dev-only"}
+            )
+            hard_extractor = DoclingExtractor(development_config)
     cache = DiskCache(
         effective_config.cache.dir,
         source_hash,
@@ -230,15 +243,32 @@ def convert(
                     else:
                         use_hard = pipeline == "docling-only" or page_class != "TEXT"
                         if use_hard:
-                            extraction_method: Literal["pdfplumber", "docling"] = "docling"
-                            fallback_warnings: list[str] = []
-                            key = docling_cache_key(
-                                page_number,
-                                effective_config.hard.model_dump(mode="json"),
-                                _version("docling"),
+                            use_kelpie_hard = (
+                                pipeline != "docling-only"
+                                and effective_config.hard.engine == "kelpie"
                             )
+                            extraction_method: Literal["pdfplumber", "docling", "vision"] = (
+                                "vision" if use_kelpie_hard else "docling"
+                            )
+                            fallback_warnings: list[str] = []
+                            if use_kelpie_hard:
+                                assert vision_backend is not None
+                                key = vision_cache_key(
+                                    f"hard-page:{page_number}",
+                                    effective_config.vision.transcribe_prompt,
+                                    getattr(vision_backend, "model", "unknown"),
+                                    effective_config.vision.model_dump(mode="json"),
+                                )
+                                cache_stage = "vision-page"
+                            else:
+                                key = docling_cache_key(
+                                    page_number,
+                                    effective_config.hard.model_dump(mode="json"),
+                                    _version("docling"),
+                                )
+                                cache_stage = "docling"
                             try:
-                                cached = cache.get("docling", key)
+                                cached = cache.get(cache_stage, key)
                                 if cached is not None:
                                     hard_blocks = _blocks_from_cache(cached)
                                     collector.record_cache(hit=True)
@@ -248,9 +278,16 @@ def convert(
                                     hard_blocks = hard_extractor.extract(
                                         source_path, [page_number], context=context
                                     )[page_number]
-                                    collector.record_docling(time.perf_counter() - hard_started)
+                                    if extraction_method == "docling":
+                                        collector.record_docling(time.perf_counter() - hard_started)
+                                    for call_id, call_result in getattr(
+                                        hard_extractor, "drain_calls", lambda: []
+                                    )():
+                                        collector.record_call(
+                                            "transcribe_page", call_id, call_result
+                                        )
                                     cache.put(
-                                        "docling",
+                                        cache_stage,
                                         key,
                                         {
                                             "blocks": [
@@ -282,6 +319,8 @@ def convert(
                                 if pipeline == "docling-only"
                                 else f"routed_to_hard_path:{','.join(decision.reasons)}"
                             ]
+                            if extraction_method == "vision":
+                                result_warnings.append("hard_path:kelpie")
                             result = PageResult(
                                 page=page_number,
                                 status="ok",

@@ -553,3 +553,17 @@ model-download certificate chain. Kelpie already provides the approved route to
 EDAG-hosted models. Treating local provisioning as a future fix would misstate
 the supported product and repeatedly lead implementation work toward an
 impossible deployment path.
+
+## ADR-039: Kelpie hard-page implementation
+
+**Decision:** The enterprise hard path renders only routed `COMPLEX` and
+`SCANNED` pages locally and sends their PNG bytes to Kelpie through the existing
+`VisionBackend.transcribe_page()` contract. The default deployment is
+`DARE-NoCloud-Helios`; its response is parsed as Markdown into common heading,
+paragraph, list, and table blocks. The default tiered pipeline never initializes
+Docling for enterprise hard pages.
+
+**Reason:** Helios is the verified vision-capable EDAG-hosted deployment. This
+keeps model inference on EDAG servers, preserves the tiered cost model for
+ordinary text pages, and reuses the discovered Kelpie API instead of inventing
+a second service or installing local model files.

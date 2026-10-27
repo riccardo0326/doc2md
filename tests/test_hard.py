@@ -73,11 +73,11 @@ def test_docling_adapter_import_is_lazy() -> None:
 def test_docling_requires_supported_hard_adapter_by_default() -> None:
     source = Path("tests/fixtures/synthetic/phase1_table.pdf")
 
-    with pytest.raises(HardExtractionError, match="approved remote|unsupported"):
-        DoclingExtractor().extract(source, [1])
+    with pytest.raises(HardExtractionError, match="artifacts|unsupported"):
+        DoclingExtractor(HardConfig(engine="docling-dev-only")).extract(source, [1])
 
 
-def test_default_hard_path_fails_page_without_remote_download() -> None:
+def test_default_hard_path_reports_kelpie_unavailability() -> None:
     source = Path("tests/fixtures/synthetic/phase1_image_only.pdf")
 
     result = convert(source)
@@ -85,7 +85,7 @@ def test_default_hard_path_fails_page_without_remote_download() -> None:
     page = result.document.pages[0]
     assert page.status == "failed"
     assert page.error is not None
-    assert "unsupported" in page.error.lower()
+    assert "kelpie" in page.error.lower()
 
 
 def test_text_backed_hard_failure_falls_back_to_pdfplumber() -> None:

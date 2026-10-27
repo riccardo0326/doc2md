@@ -545,7 +545,7 @@ column_gutter_min_pt = 20
 engine = "docling-dev-only"        # enterprise target: Kelpie-backed hard path
 languages = ["en", "de"]
 threads = 4
-# No enterprise model/artifact path exists. Hard processing requires an approved remote adapter.
+# No enterprise model/artifact path exists. Hard processing uses Kelpie/Helios on EDAG servers.
 
 [images]
 enabled = true

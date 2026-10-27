@@ -1,11 +1,10 @@
-# task-007 - Provision and Verify Hard-Path OCR
+# task-007 - Legacy Local-Model OCR Task
 
-## What to build
-Record and verify the enterprise hard-processing boundary for image-only table
-pages. Local OCR/layout/model installation and model downloads are out of scope
-on enterprise PCs. Add an explicit slow integration seam for the Kelpie-backed
-hard path using the discovered vision contract; until then, verify the isolated
-failure behavior and record the environment state.
+## Superseded
+
+This task is superseded by `workflow/tasks/task-012-kelpie-hard-path.md`.
+Enterprise OCR/layout inference must use Kelpie with models hosted locally on
+EDAG servers. No local model provisioning task remains in this repository.
 
 ## Why
 The image-only table sample and two scanned pages cannot be judged by the fast
@@ -36,16 +35,7 @@ Modify:
 - [ ] Ruff and mypy pass.
 
 ## Status
-blocked
+cancelled
 
-### Blocker
-The current workstation has no implemented Kelpie-backed hard path. A disposable
-development artifact download was attempted only to document the boundary and
-failed on the corporate self-signed TLS certificate. TLS verification was not
-bypassed, and no model artifacts were copied into the repository.
-
-### Already verified
-- The existing slow Docling table/OCR tests remain available as disposable
-  development diagnostics only.
-- Default runtime behavior still rejects missing artifacts with a clear
-  `HardExtractionError`.
+### Replacement
+- `task-012-kelpie-hard-path`

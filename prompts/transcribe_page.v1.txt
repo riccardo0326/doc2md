@@ -1,0 +1,7 @@
+Transcribe the page into faithful Markdown for a document-to-Markdown pipeline.
+
+Return only Markdown. Preserve the page's reading order, headings, paragraphs,
+lists, table headers, table rows, visible text, and meaningful symbols. Use
+Markdown headings for headings, hyphen lists for lists, and GFM pipe tables for
+tables. Do not add explanations, summaries, JSON, or content not visible on the
+page. Preserve uncertainty as text rather than inventing values.
