@@ -20,3 +20,10 @@
 - Commits:
   - `fd93f3c` docs(policy): define enterprise no-local-model boundary
 - QA: `workflow/qa/followup-parser-fixes-qa.md`
+
+## Kelpie enterprise hard-path clarification
+- Branch: `feature/unstructured-demo-quality`
+- Pushed: 2026-10-27
+- Commits:
+  - `abb40e4` docs(policy): use Kelpie EDAG-hosted models for enterprise hard path
+- QA: `workflow/qa/followup-parser-fixes-qa.md`
