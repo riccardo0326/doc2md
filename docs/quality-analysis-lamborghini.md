@@ -28,8 +28,8 @@ Observed results:
 - The five complex pages are pages 7, 8, 9, 11, and 22, all for
   `irregular_table`.
 - The fresh text-only conversion completes in about 2 seconds, but all five
-  complex pages are recorded as failed because no approved remote hard adapter
-  is configured for the enterprise runtime.
+  complex pages are recorded as failed because the Kelpie-backed hard path is
+  not implemented for the enterprise runtime.
 - The fresh default conversion also completes, but the page-1 logo is saved
   and receives an image-description failure placeholder because Kelpie is not
   configured in that environment.
@@ -44,15 +44,16 @@ The configured enterprise behavior is intentional: local Docling/OCR model
 execution and model downloads are outside the enterprise product boundary. A
 previous disposable development run converted page 7 through Docling and
 returned a 5-row, 2-column table, but that evidence is not an enterprise
-deployment path. The supported product path requires an approved remote hard
-adapter; until it exists, hard-page failures remain isolated and explicit.
+deployment path. The supported product path requires the Kelpie-backed hard
+path, using models hosted locally on EDAG servers; until it exists, hard-page
+failures remain isolated and explicit.
 
 ## Findings
 
 ### F1 - Recoverable complex pages become empty failures (high)
 
 `src/doc2md/api.py` dispatches every non-`TEXT` page to the hard adapter. When
-no approved remote hard adapter is available, the page loop records a
+the Kelpie-backed hard path is not available, the page loop records a
 failed page and emits only a placeholder. The PDF still has a text layer on all
 five pages. Direct calls to the existing fast extractor recover substantial
 content on pages 7, 8, 9, and 22, including rectangular table data; page 11
@@ -144,7 +145,7 @@ Git.
 4. `task-004`: generic decorative-image filtering and vision degradation checks.
 5. `task-005`: reusable external quality run and Markdown checks.
 
-An approved remote hard adapter remains a prerequisite for claiming enterprise
+The Kelpie-backed hard path remains a prerequisite for claiming enterprise
 scanned/OCR and high-fidelity complex-table support. The fallback is for
 continuity and development ergonomics, not a substitute for that supported
 remote service.
@@ -172,7 +173,7 @@ python scripts/check_quality.py --source <external-source.pdf> --reference <exte
 
 The report must distinguish these cases:
 
-- normal extraction through the approved remote hard adapter;
+- normal extraction through the Kelpie-backed hard path;
 - disposable development-only Docling extraction, if separately available;
 - transparent pdfplumber fallback for text-backed complex pages;
 - an actual page with no usable extraction, which remains failed.

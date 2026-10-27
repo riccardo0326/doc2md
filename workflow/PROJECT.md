@@ -42,6 +42,6 @@ Env variables: Credentials and Kelpie settings come from environment variables; 
 - PDF-specific branches, page-number checks, or copied reference output.
 
 ## Known constraints
-- Enterprise PCs must not install or provision OCR/layout/model artifacts. Hard processing requires an approved remote adapter; Docling is development-only.
+- Enterprise PCs must not install or provision OCR/layout/model artifacts. Hard processing uses Kelpie with models hosted locally on EDAG servers; Docling is development-only.
 - Tests must remain synthetic and offline by default.
 - The fast path must preserve English and German characters and provenance.

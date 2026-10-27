@@ -1,9 +1,9 @@
 # task-002 - Preserve Text When the Remote Hard Path Is Unavailable
 
 ## What to build
-Keep the approved remote hard adapter as the preferred extractor for `COMPLEX`
-and `SCANNED` pages, but add a transparent degraded fallback for a complex page
-that still has a usable text layer when the hard adapter is unavailable.
+Keep the Kelpie-backed hard path as the preferred extractor for `COMPLEX` and
+`SCANNED` pages, but add a transparent degraded fallback for a complex page
+that still has a usable text layer when the Kelpie hard path is unavailable.
 Reuse the existing pdfplumber extractor, mark the page method and warning
 accurately, and leave textless scanned pages failed. Improve best-effort GFM
 rendering for merged or one-row tables so recoverable cells are not silently
@@ -12,7 +12,7 @@ Docling-level table fidelity.
 
 ## Why
 The supplied PDF has five complex pages with recoverable text, but the current
-enterprise environment has no approved remote hard adapter. The API currently turns
+enterprise environment has no implemented Kelpie hard path. The API currently turns
 each such page into a failure and drops all page content.
 
 ## Relevant files
@@ -47,7 +47,7 @@ Modify:
 
 ## Edge cases to handle
 - When the fallback returns no blocks: preserve the original page failure and error.
-- When the remote hard adapter raises a non-availability extraction error: do not silently mask it unless the approved policy explicitly includes that class.
+- When the Kelpie hard path raises a non-availability extraction error: do not silently mask it unless the approved policy explicitly includes that class.
 - When a fallback table has blank cells: never invent repeated cell values.
 
 ## Do not touch
@@ -74,7 +74,7 @@ Files modified:
 - `docs/decisions.md` - recorded ADR-033 for fallback semantics.
 
 Deviations from spec (if any):
-- The fallback is an explicit degraded mode for digital `COMPLEX` pages only; Docling remains preferred and scanned pages still fail when unavailable.
+- The fallback is an explicit degraded mode for digital `COMPLEX` pages only; the Kelpie hard path remains preferred and scanned pages still fail when unavailable.
 
 Suggestions for follow-up (do not act on these):
-- Integrate the approved remote hard adapter and compare its output with the fallback on the external corpus.
+- Implement the Kelpie hard path and compare its output with the fallback on the external corpus.

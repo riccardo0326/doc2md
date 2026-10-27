@@ -359,6 +359,13 @@ Defaults (to be tuned in Phase 9 on real documents): `min_chars=50`, `min_chars_
 
 ### 6.3 Hard extractor — Docling adapter
 
+The enterprise hard path is Kelpie-backed: it renders the selected page and
+uses the discovered `VisionBackend.transcribe_page()` contract to call models
+hosted locally on EDAG servers. No model file is installed on the enterprise
+PC. The Kelpie hard-page adapter is a follow-up implementation seam; until it
+exists, hard pages fail in isolation or use the text-backed fallback where
+eligible.
+
 ```python
 class HardExtractor(Protocol):
     def extract(self, source: Path, pages: Sequence[int], ctx: RunContext) -> dict[int, list[Block]]: ...
@@ -368,7 +375,7 @@ class HardExtractor(Protocol):
 `DoclingExtractor` rules:
 - `import docling` **inside** `__init__`/first call only (lazy). One `DocumentConverter` instance per `DoclingExtractor`, created on first use, reused for all pages of the run (and across documents if the same `RunContext` is reused by the benchmark).
 - Docling is a disposable development/diagnostic adapter only. Enterprise PCs must not install, copy, provision, or download its OCR/layout model artifacts. Pipeline options remain CPU, table structure enabled, and **picture description/classification off** when the adapter is explicitly exercised outside the enterprise runtime.
-- If the development adapter is unavailable, or if the enterprise runtime has no approved remote hard-processing adapter, raise `HardExtractionError` before initializing the pipeline. The converter records the affected page as failed and continues; it never disables TLS verification or suggests local model provisioning.
+- If the development adapter is unavailable, or if the enterprise Kelpie-backed hard path is not implemented, raise `HardExtractionError` before initializing the pipeline. The converter records the affected page as failed and continues; it never disables TLS verification or suggests local model provisioning.
 - Page selection: preferred is Docling's page-range option of `convert(...)`; if unavailable in the installed version, create a temporary sub-PDF containing only routed pages (pypdfium2 `import_pages`) and keep a `sub_index -> original_page` map. Whichever is used, **map back to original page numbers**. Phase 0 records which one works.
 - Batch all routed pages of a document in **one** call where contiguous ranges allow, to amortise overhead; otherwise one call per contiguous range.
 - Map Docling items to `Block`: section headers → `heading` (level from Docling), text → `paragraph`, list items → `list`, tables → `table` (Markdown via Docling table export, `meta` holds rows/cols), pictures → handled by the image stage (no `figure` block created here, to avoid double work). `Provenance.source="docling"`, `bbox` copied if available.
@@ -535,7 +542,7 @@ heading_ratio = 1.25
 column_gutter_min_pt = 20
 
 [hard]
-engine = "docling"
+engine = "docling-dev-only"        # enterprise target: Kelpie-backed hard path
 languages = ["en", "de"]
 threads = 4
 # No enterprise model/artifact path exists. Hard processing requires an approved remote adapter.
@@ -587,7 +594,7 @@ Exception hierarchy (`errors.py`): `Doc2MdError` ← `ConfigError`, `Unsupported
 |-----------|-----------|
 | File missing/unreadable/encrypted | `SourceError`, exit 1 (encrypted: message says password unsupported in v1) |
 | One page fails in fast or hard path | page `failed`, placeholder in Markdown, continue; warning in `run.json` |
-| Docling unavailable or no approved remote hard adapter exists | `HardExtractionError` for those pages with a clear enterprise-boundary message; pages still marked failed, others continue |
+| Docling unavailable or Kelpie hard path not implemented | `HardExtractionError` for those pages with a clear enterprise-boundary message; pages still marked failed, others continue |
 | Kelpie unreachable | image stage: images marked `failed`, document completes, warning; `full-vision` pipeline: exit 4 |
 | Kelpie transient error | retry with backoff; then failed record |
 | Invalid config | `ConfigError`, exit 2, message names the key |

@@ -21,7 +21,8 @@ are complete; the remaining real-document requirement applies before benchmark
 work. Local OCR/layout/model artifacts are **not** an enterprise provisioning
 option: corporate PCs cannot install, copy, or download them. Docling evidence
 below is disposable development evidence only; enterprise hard processing must
-use an approved remote adapter or report an isolated page failure.
+use Kelpie with models hosted locally on EDAG servers, or report an isolated
+page failure until that Kelpie hard path is implemented.
 
 ## Environment
 
@@ -46,7 +47,8 @@ repository was not modified by that installation.
 `tesseract` is not installed on this workstation. Local OCR/layout model
 execution is outside the enterprise product perimeter. Runtime model downloads
 and artifact provisioning on corporate PCs are prohibited; the supported
-enterprise solution must be a remote approved hard-processing adapter.
+enterprise solution must use the Kelpie service boundary and its EDAG-hosted
+models.
 
 ## PDF And Docling
 
@@ -359,8 +361,9 @@ allow-list. The human accepted this as a documented Phase 0 exception on
 
 Use a thin native adapter in `src/doc2md/vision/kelpie.py` after sign-off:
 
-- use the approved authenticated Kelpie service/proxy as the primary remote
-  transport; no model is installed on the EDAG workstation;
+- use the approved authenticated Kelpie service/proxy as the primary transport
+  to models hosted locally on EDAG servers; no model is installed on the EDAG
+  workstation;
 - depend on `openai` and keep the proxy/service-account choice behind the thin
   adapter; do not depend on `ai4tc_webapp` or its LangChain wrapper;
 - create the proxy client lazily and normalize its base URL to `/openai/v1`;
@@ -406,5 +409,5 @@ inside the configured artifact tree. The official command
 and failed because the workstation corporate TLS chain presents a self-signed
 certificate. TLS verification was not disabled. No model artifacts or sample
 PDFs were added to the repository. Scanned OCR remains unsupported on the
-enterprise PC until an approved remote hard-processing adapter is available;
-no local artifact bundle will be provisioned.
+enterprise PC until the Kelpie-backed hard path is implemented; no local
+artifact bundle will be provisioned.

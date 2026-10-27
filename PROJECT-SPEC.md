@@ -85,7 +85,7 @@ print(result.markdown_path, result.stats.vision_tokens_total)
 - Sample PDFs from Oz/Hannes and all outputs are confidential. They live in `samples/` and `out/`, both in `.gitignore`.
 - Tests use only **synthetic PDFs generated in code** or public-domain PDFs committed deliberately as small fixtures.
 - Disable third-party telemetry (`HF_HUB_DISABLE_TELEMETRY=1`, `DO_NOT_TRACK=1`); no network calls except package installation and approved Kelpie traffic.
-- Enterprise runtime machines must not depend on, install, or provision model artifacts. Docling/OCR local-model execution is outside the supported enterprise product. If no approved remote hard-processing adapter is available, the affected hard page is an isolated, clearly reported failure; TLS must never be disabled.
+- Enterprise runtime machines must not depend on, install, or provision model artifacts. Docling/OCR local-model execution is outside the supported enterprise product. The enterprise hard path must use Kelpie with models hosted locally on EDAG servers, using the discovered remote vision contract; until that path is implemented, the affected hard page is an isolated, clearly reported failure. TLS must never be disabled.
 - Benchmark reports shared with stakeholders contain metrics and short anonymised excerpts only, unless the human says otherwise.
 
 ### 5.3 Licensing
@@ -109,7 +109,7 @@ print(result.markdown_path, result.stats.vision_tokens_total)
 
 **FR3 — Fast path.** `TEXT` pages: extract with pdfplumber, reconstruct reading order, headings (heuristic by font size), paragraphs, lists, simple tables → Markdown. Normalise ligatures (ﬁ ﬂ ﬀ ﬃ ﬄ ﬅ ﬆ), soft hyphens and line-break hyphenation **without hard-coded character special cases elsewhere**.
 
-**FR4 — Hard path.** `COMPLEX` and `SCANNED` pages use a replaceable hard-processing adapter. The enterprise implementation must be a separately approved remote adapter reachable through the corporate service boundary. The Docling adapter is disposable development/diagnostic code only and is not an enterprise runtime prerequisite; if no supported adapter is available, the page fails in isolation with provenance and a clear reason.
+**FR4 — Hard path.** `COMPLEX` and `SCANNED` pages use the Kelpie-backed hard path, with models hosted locally on EDAG servers and calls made through the discovered `VisionBackend` contract. The Docling adapter is disposable development/diagnostic code only and is not an enterprise runtime prerequisite; until Kelpie hard transcription/layout is implemented, the page fails in isolation with provenance and a clear reason.
 
 **FR5 — Image handling.** Extract embedded images from every page; skip images below configurable thresholds (min width/height/area, extreme aspect ratio, exact duplicates by hash); save kept images to `images/`; send them to the Kelpie vision model for a description; insert the description **inline** in the Markdown next to an image link. Descriptions are cached.
 
@@ -217,7 +217,7 @@ Acceptance: `docs/discovery.md` complete; human replies "go".
 - Run the benchmark on the complete local corpus: all permitted PDFs in `samples/`, all committed synthetic PDFs used by the test suite, and every PDF discovered under the read-only cloned reference repository `C:\Users\rp99480\dev\ai4tc_webapp` when present. The real EDAG OCR baseline is explicitly **out of scope** for this phase; compare `tiered` with `full-vision` and leave an integration seam for a parallel manual comparison with the existing OCR software.
 - `docs/FINDINGS.md`: method, corpus manifest, results tables, charts (optional), **recommendation vs go/no-go criteria (section 8)** adapted to the available comparisons, explicit baseline exclusion, risks, and what to do next (e.g. add the EDAG adapter, docx/xlsx/eml converters, bounding boxes, image classifier).
 - Packaging: `pyproject.toml` with extras `[hard]` (docling) and `[bench]`; `README.md` (install, usage, library API); `THIRD_PARTY_NOTICES.md`; version `0.1.0`.
-- Acceptance: fresh virtualenv `pip install .[hard,bench]` works for development tooling; README examples run; the corpus discovery command is deterministic and does not copy confidential PDFs; FINDINGS cites the exact run directory and versions used, or clearly records an environment block when the approved remote hard adapter or external PDFs are unavailable.
+- Acceptance: fresh virtualenv `pip install .[hard,bench]` works for development tooling; README examples run; the corpus discovery command is deterministic and does not copy confidential PDFs; FINDINGS cites the exact run directory and versions used, or clearly records an environment block when the Kelpie-backed hard path or external PDFs are unavailable.
 
 ## 8. Success criteria and go/no-go (proposed values only — to be reviewed by Riccardo, then confirmed with Amro and Oz before Phase 9)
 
@@ -258,7 +258,7 @@ Timeline expectation from the call: Riccardo estimated **about one week** for a 
 | A7 | Project/package name | **Closed: `doc2md`** (project folder `doc2md`) | — |
 | A8 | Whether the vision model and judge model are the same | Same unless Phase 0 shows a better local option | Phase 0 |
 | A9 | Whether benchmark excerpts may be shared outside the team | No: metrics and anonymised excerpts only | Oz/Hannes |
-| A10 | Whether OCR/layout/model artifacts may be installed or downloaded on an enterprise PC | **No: local model execution and provisioning are out of scope.** Use an approved remote hard-processing adapter; otherwise isolate the page failure. | Human enterprise-runtime decision |
+| A10 | Where enterprise hard OCR/layout inference runs | **Kelpie, using models hosted locally on EDAG servers; no model files on the PC.** Until the Kelpie hard path is implemented, isolate the page failure. | Human enterprise-runtime decision |
 
 ## 11. Glossary
 

@@ -3,13 +3,13 @@
 ## What to build
 Record and verify the enterprise hard-processing boundary for image-only table
 pages. Local OCR/layout/model installation and model downloads are out of scope
-on enterprise PCs. Add an explicit slow integration seam for the approved remote
-hard adapter when its contract is available; until then, verify the isolated
+on enterprise PCs. Add an explicit slow integration seam for the Kelpie-backed
+hard path using the discovered vision contract; until then, verify the isolated
 failure behavior and record the environment state.
 
 ## Why
 The image-only table sample and two scanned pages cannot be judged by the fast
-path. The current workstation has no approved remote hard adapter, and local
+path. The current workstation has no implemented Kelpie hard path, and local
 model provisioning is prohibited by the enterprise boundary.
 
 ## Relevant files
@@ -39,7 +39,7 @@ Modify:
 blocked
 
 ### Blocker
-The current workstation has no approved remote hard adapter. A disposable
+The current workstation has no implemented Kelpie-backed hard path. A disposable
 development artifact download was attempted only to document the boundary and
 failed on the corporate self-signed TLS certificate. TLS verification was not
 bypassed, and no model artifacts were copied into the repository.

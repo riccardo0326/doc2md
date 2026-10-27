@@ -20,7 +20,7 @@ baseline must be verified before their concrete integrations are implemented.
 
 - `tiered` uses the router: `TEXT` uses pdfplumber; `COMPLEX` and `SCANNED`
   use Docling.
-- `SCANNED` pages use the configured hard adapter. Docling OCR is development-only; enterprise PCs use an approved remote hard-processing adapter or record an isolated failure.
+- `SCANNED` pages use the Kelpie-backed hard path, with models hosted locally on EDAG servers. Docling OCR is development-only; until the Kelpie hard path is implemented, record an isolated failure.
 - `full-vision` sends every page to vision and disables the image stage.
 - `docling-only` sends every page to Docling, extracts and saves images, but
   never calls vision. Saved images are linked without descriptions and are
@@ -310,8 +310,8 @@ avoids importing or loading Docling for text-only conversions.
 **Environment note:** OCR integration is implemented behind the replaceable hard
 adapter, but local OCR/model execution is outside the enterprise product
 boundary. The workstation's corporate TLS policy also prevents model downloads;
-the slow OCR test records this as an environment skip. Enterprise support waits
-for an approved remote hard-processing adapter.
+ the slow OCR test records this as an environment skip. Enterprise support waits
+ for the Kelpie-backed hard-processing path.
 
 ## ADR-025: Phase 5 vision transport and image identity
 
@@ -341,13 +341,15 @@ from the completed Phase 5 image/vision pipeline.
 **Decision:** OCR, layout, and LLM model files are out of scope on enterprise
 PCs. They must not be installed, copied, provisioned, or downloaded there.
 Docling remains a disposable development diagnostic only. Enterprise hard pages
-require an approved remote adapter through the corporate service boundary; until
-that adapter exists, affected pages fail in isolation with an explicit runtime
-boundary message.
+must use Kelpie with models hosted locally on EDAG servers, through the
+discovered `VisionBackend`/`transcribe_page` contract; until that Kelpie hard
+path exists, affected pages fail in isolation with an explicit runtime-boundary
+message.
 
 **Reason:** The target corporate machines reject model-download TLS and cannot
-host local model artifacts. A production conversion must never depend on local
-model installation, bypass TLS, or silently download models.
+host local model artifacts. Kelpie already provides the approved service boundary
+to EDAG-hosted models. A production conversion must use that boundary, never
+install models locally, bypass TLS, or silently download models.
 
 ## ADR-022: Phase 3 routing boundary
 
@@ -468,9 +470,9 @@ layer and the hard extractor raises `HardExtractionError`, run the existing
 pdfplumber fast extractor as a degraded fallback. Keep the original
 `page_class="COMPLEX"`, set the page method to `pdfplumber`, and record the
 hard-path error in a `hard_path_fallback` warning. A `SCANNED` page never uses
-this fallback and remains failed when its hard path fails. An approved remote
-hard adapter remains the enterprise preferred method; Docling is only a
-disposable development diagnostic.
+this fallback and remains failed when its hard path fails. The Kelpie-backed
+hard path, using models hosted locally on EDAG servers, remains the enterprise
+preferred method; Docling is only a disposable development diagnostic.
 
 **Reason:** Missing or unavailable hard processing must not discard text that
 can be recovered deterministically from a digital page. The warning makes the
@@ -540,12 +542,14 @@ replaceable without hardcoding sample content or assuming local model files.
 **Decision:** The supported runtime is restricted to enterprise PCs with the
 same corporate network and TLS constraints as the development target. OCR,
 layout, and LLM model files must not be installed, copied, provisioned, or
-downloaded on those PCs. Model inference must cross an approved remote service
-boundary, currently Kelpie for vision; a future remote hard adapter is required
-for scanned/layout-heavy pages. Disposable development Docling experiments are
-not a product prerequisite or an enterprise setup instruction.
+downloaded on those PCs. All model inference must cross Kelpie, using models
+hosted locally on EDAG servers. The existing Kelpie vision contract is known;
+the hard page path must reuse that boundary for scanned/layout-heavy pages.
+Disposable development Docling experiments are not a product prerequisite or
+an enterprise setup instruction.
 
 **Reason:** The enterprise machine cannot install local models and rejects the
-model-download certificate chain. Treating provisioning as a future fix would
-misstate the supported product and repeatedly lead implementation work toward
-an impossible deployment path.
+model-download certificate chain. Kelpie already provides the approved route to
+EDAG-hosted models. Treating local provisioning as a future fix would misstate
+the supported product and repeatedly lead implementation work toward an
+impossible deployment path.

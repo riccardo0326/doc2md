@@ -12,8 +12,10 @@ pip install .[hard]
 
 Use `.[dev]` for tests, Ruff, and mypy. The optional `[hard]` extra is for
 disposable development diagnostics only. Enterprise PCs must not install or
-download OCR/layout/model artifacts; supported hard processing requires an
-approved remote adapter, otherwise the affected page is reported as failed.
+download OCR/layout/model artifacts; supported hard processing uses Kelpie with
+models hosted locally on EDAG servers. Until the Kelpie hard-page path is
+implemented, affected pages are reported as failed or use the eligible text
+fallback.
 
 ## Convert
 
@@ -35,7 +37,7 @@ print(result.stats.vision_tokens_total)
 
 ## Pipelines
 
-- `tiered`: pdfplumber for text pages, then the approved hard adapter for hard pages.
+- `tiered`: pdfplumber for text pages, then the Kelpie-backed hard path for hard pages.
 - `full-vision`: renders and transcribes every page through Kelpie.
 - `docling-only`: disposable development diagnostic; sends every page to Docling and does not call vision.
 

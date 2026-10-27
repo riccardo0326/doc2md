@@ -6,7 +6,7 @@
 | 1 | Complete | 4 tests, CLI/API, provenance sidecar, deterministic outputs | `phase-1` |
 | 2 | Complete | 21 tests, normalization and real ligature fixture | `phase-2` |
 | 3 | Complete | 34 default tests, `inspect`, signals and routing | `phase-3` |
-| 4 | Complete as development adapter | Docling table/page-range tests; local model execution is outside enterprise scope; OCR measurements await an approved remote hard adapter | `phase-4` |
+| 4 | Complete as development adapter | Docling table/page-range tests; local model execution is outside enterprise scope; OCR measurements await the Kelpie-backed hard path | `phase-4` |
 | 5 | Complete | 40 default tests, FakeVisionBackend, image filtering/dedupe, real Kelpie probe | `phase-5` |
 | 6 | Complete with local-environment exception | FR3 enrichment, three pipelines, JSON cache, no-cache, derived call/token metrics; 46 default tests | `phase-6` |
 | 7 | Complete with baseline exception | Benchmark suite loader, cold-cache runner, exact results CSV, deterministic report; 50 default tests | `phase-7` |
@@ -18,7 +18,7 @@
 - The current corpus includes every permitted sample and committed
   synthetic PDF; the cloned reference repository currently contributes no PDFs.
 - Local Docling/OCR model execution and runtime downloads are outside the enterprise product perimeter.
-- Scanned OCR is unavailable until an approved remote hard-processing adapter is integrated.
+- Scanned OCR is unavailable until the Kelpie-backed hard path is integrated.
 
 ## Remaining Product Work
 
