@@ -27,3 +27,10 @@
 - Commits:
   - `abb40e4` docs(policy): use Kelpie EDAG-hosted models for enterprise hard path
 - QA: `workflow/qa/followup-parser-fixes-qa.md`
+
+## task-012 - Kelpie hard path
+- Branch: `feature/kelpie-hard-path`
+- Pushed: 2026-10-27
+- Commits:
+  - `8408572` feat(kelpie): add enterprise hard page path
+- QA: `workflow/qa/task-012-kelpie-hard-path-qa.md`
