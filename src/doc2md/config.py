@@ -41,6 +41,7 @@ class HardConfig(BaseModel):
     engine: str = "kelpie"
     languages: list[str] = Field(default_factory=lambda: ["en", "de"])
     threads: int = 4
+    page_dpi: int = 200
     artifacts_path: str | None = None
     ocr: bool = True
     allow_remote_download: bool = False
@@ -72,6 +73,7 @@ class VisionConfig(BaseModel):
     max_workers: int = 1
     page_dpi: int = 150
     max_tokens: int = 800
+    transcribe_max_tokens: int = 1600
     temperature: float = 0.0
     timeout_s: float = 120.0
     max_retries: int = 3

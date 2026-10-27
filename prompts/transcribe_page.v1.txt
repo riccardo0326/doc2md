@@ -4,4 +4,6 @@ Return only Markdown. Preserve the page's reading order, headings, paragraphs,
 lists, table headers, table rows, visible text, and meaningful symbols. Use
 Markdown headings for headings, hyphen lists for lists, and GFM pipe tables for
 tables. Do not add explanations, summaries, JSON, or content not visible on the
-page. Preserve uncertainty as text rather than inventing values.
+page. If the page is scanned or image-only, transcribe all legible visible text
+and tables rather than returning an empty response. Preserve uncertainty as
+text rather than inventing values.

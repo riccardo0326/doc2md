@@ -106,3 +106,4 @@ Deviations from spec (if any):
 
 Suggestions for follow-up (do not act on these):
 - Run the `@pytest.mark.kelpie` hard-page test on the corporate proxy with Helios.
+- Revisit hard-page DPI/token budgets after a larger corporate corpus benchmark.

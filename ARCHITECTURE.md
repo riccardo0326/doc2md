@@ -545,6 +545,7 @@ column_gutter_min_pt = 20
 engine = "docling-dev-only"        # enterprise target: Kelpie-backed hard path
 languages = ["en", "de"]
 threads = 4
+page_dpi = 200
 # No enterprise model/artifact path exists. Hard processing uses Kelpie/Helios on EDAG servers.
 
 [images]
@@ -561,6 +562,7 @@ backend = "kelpie"             # "fake" for tests
 max_workers = 4
 page_dpi = 150
 max_tokens = 800
+transcribe_max_tokens = 1600
 temperature = 0.0
 timeout_s = 120
 max_retries = 3

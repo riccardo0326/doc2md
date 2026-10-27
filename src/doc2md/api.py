@@ -92,6 +92,14 @@ def _blocks_from_cache(value: dict[str, object]) -> list[Block]:
     return [Block.model_validate(item) for item in raw_blocks if isinstance(item, dict)]
 
 
+def _record_hard_calls(hard_extractor: object, collector: MetricsCollector) -> None:
+    drain_calls = getattr(hard_extractor, "drain_calls", None)
+    if not callable(drain_calls):
+        return
+    for call_id, call_result in drain_calls():
+        collector.record_call("transcribe_page", call_id, call_result)
+
+
 def _backend(context: object | None, config: Config, required: bool) -> VisionBackend | None:
     supplied = getattr(context, "vision", None) if context is not None else None
     if supplied is not None:
@@ -136,7 +144,7 @@ def convert(
                 raise ConfigError("Kelpie hard path requires a vision backend")
             hard_extractor = KelpieHardExtractor(
                 vision_backend,
-                page_dpi=effective_config.vision.page_dpi,
+                page_dpi=effective_config.hard.page_dpi,
                 prompt_id=effective_config.vision.transcribe_prompt,
             )
         else:
@@ -280,12 +288,7 @@ def convert(
                                     )[page_number]
                                     if extraction_method == "docling":
                                         collector.record_docling(time.perf_counter() - hard_started)
-                                    for call_id, call_result in getattr(
-                                        hard_extractor, "drain_calls", lambda: []
-                                    )():
-                                        collector.record_call(
-                                            "transcribe_page", call_id, call_result
-                                        )
+                                    _record_hard_calls(hard_extractor, collector)
                                     cache.put(
                                         cache_stage,
                                         key,
@@ -297,6 +300,7 @@ def convert(
                                         },
                                     )
                             except HardExtractionError as error:
+                                _record_hard_calls(hard_extractor, collector)
                                 if not (
                                     pipeline == "tiered"
                                     and page_class == "COMPLEX"
