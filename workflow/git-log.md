@@ -41,3 +41,10 @@
 - Commits:
   - `c70cc4a` fix(kelpie): tune hard transcription resolution and budget
 - QA: `workflow/qa/task-012-kelpie-hard-path-qa.md`
+
+## task-013 - Markdown parser layout artifacts
+- Branch: `feature/task-013-parser-fixes`
+- Pushed: 2026-10-27
+- Commits:
+  - `7827703` fix(parser): remove PDF layout artifacts
+- QA: `workflow/qa/task-013-parser-fixes-qa.md`
