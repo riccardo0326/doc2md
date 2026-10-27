@@ -13,3 +13,10 @@
 - Commits:
   - `e73c0ea` fix(quality): improve empty pages columns tables and glyphs
 - QA: `workflow/qa/followup-parser-fixes-qa.md`
+
+## Enterprise model-hosting policy
+- Branch: `feature/unstructured-demo-quality`
+- Pushed: 2026-10-27
+- Commits:
+  - `fd93f3c` docs(policy): define enterprise no-local-model boundary
+- QA: `workflow/qa/followup-parser-fixes-qa.md`
