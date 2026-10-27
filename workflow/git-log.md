@@ -34,3 +34,10 @@
 - Commits:
   - `8408572` feat(kelpie): add enterprise hard page path
 - QA: `workflow/qa/task-012-kelpie-hard-path-qa.md`
+
+## task-012 - Hard transcription tuning
+- Branch: `feature/kelpie-hard-path`
+- Pushed: 2026-10-27
+- Commits:
+  - `c70cc4a` fix(kelpie): tune hard transcription resolution and budget
+- QA: `workflow/qa/task-012-kelpie-hard-path-qa.md`
