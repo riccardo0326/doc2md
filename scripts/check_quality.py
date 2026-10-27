@@ -85,7 +85,10 @@ def _environment(config: Config) -> dict[str, Any]:
     )
     return {
         "docling_installed": importlib.util.find_spec("docling") is not None,
-        "docling_artifacts_configured": bool(artifact_path and Path(artifact_path).is_dir()),
+        "enterprise_hard_adapter_configured": False,
+        "development_docling_artifacts_present": bool(
+            artifact_path and Path(artifact_path).is_dir()
+        ),
         "vision_backend": config.vision.backend,
         "kelpie_configured": bool(
             config.vision.kelpie.base_url or os.environ.get("KELPIE_PROXY_BASE_URL")

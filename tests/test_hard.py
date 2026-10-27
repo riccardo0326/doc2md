@@ -22,7 +22,7 @@ class FailingHardExtractor:
 
     def extract(self, source: Path, pages: list[int], context: object | None = None):
         del source, pages, context
-        raise HardExtractionError("local Docling artifacts unavailable")
+        raise HardExtractionError("approved remote hard adapter unavailable")
 
 
 def _merged_table_pdf(path: Path) -> None:
@@ -70,10 +70,10 @@ def test_docling_adapter_import_is_lazy() -> None:
     assert "docling" not in sys.modules
 
 
-def test_docling_requires_local_artifacts_by_default() -> None:
+def test_docling_requires_supported_hard_adapter_by_default() -> None:
     source = Path("tests/fixtures/synthetic/phase1_table.pdf")
 
-    with pytest.raises(HardExtractionError, match="artifacts"):
+    with pytest.raises(HardExtractionError, match="approved remote|unsupported"):
         DoclingExtractor().extract(source, [1])
 
 
@@ -85,7 +85,7 @@ def test_default_hard_path_fails_page_without_remote_download() -> None:
     page = result.document.pages[0]
     assert page.status == "failed"
     assert page.error is not None
-    assert "artifacts" in page.error.lower()
+    assert "unsupported" in page.error.lower()
 
 
 def test_text_backed_hard_failure_falls_back_to_pdfplumber() -> None:
@@ -163,10 +163,13 @@ def test_fallback_preserves_lists_inside_table_cells(tmp_path: Path) -> None:
 
 
 @pytest.mark.slow
+@pytest.mark.skip(
+    reason="Enterprise hard processing is remote; local Docling model execution is out of scope"
+)
 @pytest.mark.skipif(not DOC_LING_AVAILABLE, reason="Docling optional dependency is not installed")
 def test_docling_extracts_table_blocks() -> None:
     source = Path("tests/fixtures/synthetic/phase1_table.pdf")
-    extractor = DoclingExtractor(HardConfig(ocr=False, threads=1, allow_remote_download=True))
+    extractor = DoclingExtractor(HardConfig(ocr=False, threads=1))
 
     blocks = extractor.extract(source, [1])[1]
 
@@ -179,10 +182,13 @@ def test_docling_extracts_table_blocks() -> None:
 
 
 @pytest.mark.slow
+@pytest.mark.skip(
+    reason="Enterprise hard processing is remote; local Docling model execution is out of scope"
+)
 @pytest.mark.skipif(not DOC_LING_AVAILABLE, reason="Docling optional dependency is not installed")
 def test_docling_preserves_non_contiguous_original_page_numbers() -> None:
     source = Path("tests/fixtures/synthetic/phase1_text_en.pdf")
-    extractor = DoclingExtractor(HardConfig(ocr=False, threads=1, allow_remote_download=True))
+    extractor = DoclingExtractor(HardConfig(ocr=False, threads=1))
 
     blocks_by_page = extractor.extract(source, [1, 3])
 
@@ -193,12 +199,15 @@ def test_docling_preserves_non_contiguous_original_page_numbers() -> None:
 
 
 @pytest.mark.slow
+@pytest.mark.skip(
+    reason="Enterprise hard processing is remote; local Docling model execution is out of scope"
+)
 @pytest.mark.skipif(not DOC_LING_AVAILABLE, reason="Docling optional dependency is not installed")
 def test_convert_routes_table_to_docling() -> None:
     source = Path("tests/fixtures/synthetic/phase1_table.pdf")
     config = Config(
         router=RouterConfig(complex_image_ratio=0.0, image_page_min_chars=1000),
-        hard=HardConfig(ocr=False, threads=1, allow_remote_download=True),
+        hard=HardConfig(ocr=False, threads=1),
     )
 
     result = convert(source, config=config)
@@ -208,10 +217,13 @@ def test_convert_routes_table_to_docling() -> None:
 
 
 @pytest.mark.slow
+@pytest.mark.skip(
+    reason="Enterprise hard processing is remote; local Docling model execution is out of scope"
+)
 @pytest.mark.skipif(not DOC_LING_AVAILABLE, reason="Docling optional dependency is not installed")
 def test_docling_ocr_handles_image_only_page() -> None:
     source = Path("tests/fixtures/synthetic/phase1_image_only.pdf")
-    extractor = DoclingExtractor(HardConfig(threads=1, allow_remote_download=True))
+    extractor = DoclingExtractor(HardConfig(threads=1))
 
     try:
         blocks = extractor.extract(source, [1])[1]

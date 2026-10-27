@@ -1,16 +1,16 @@
 # task-007 - Provision and Verify Hard-Path OCR
 
 ## What to build
-Provision the locally allowed Docling/OCR artifacts and add an explicit slow
-integration verification for image-only table pages. The default runtime must
-continue to reject unavailable artifacts without downloading silently. The
-verification must record original page numbers, extracted text, table row and
-column metadata, and the artifact/configuration state.
+Record and verify the enterprise hard-processing boundary for image-only table
+pages. Local OCR/layout/model installation and model downloads are out of scope
+on enterprise PCs. Add an explicit slow integration seam for the approved remote
+hard adapter when its contract is available; until then, verify the isolated
+failure behavior and record the environment state.
 
 ## Why
 The image-only table sample and two scanned pages cannot be judged by the fast
-path. Their current failures are caused by missing artifacts, not by a safe
-fallback decision.
+path. The current workstation has no approved remote hard adapter, and local
+model provisioning is prohibited by the enterprise boundary.
 
 ## Relevant files
 
@@ -25,28 +25,27 @@ Modify:
 - `docs/discovery.md` or a run report - record artifact state and timings without confidential content.
 
 ## Acceptance criteria
-- [ ] A provisioned OCR run extracts the image-only table without a failed-page placeholder.
+- [ ] An approved remote hard-adapter run extracts the image-only table without a failed-page placeholder.
 - [ ] Original page numbers and sidecar provenance are correct.
 - [ ] Missing artifacts still produce a clear isolated failure in the default path.
 - [ ] No TLS bypass or implicit runtime model download is introduced.
 
 ## Definition of done
 - [ ] Offline/default `pytest -q` remains green.
-- [ ] Explicit slow Docling/OCR test passes when artifacts are provisioned or reports an environment skip with evidence.
+- [ ] Explicit remote hard-adapter test passes when that adapter is available or reports the environment boundary with evidence.
 - [ ] Ruff and mypy pass.
 
 ## Status
 blocked
 
 ### Blocker
-The local Hugging Face cache contains TableFormer artifacts but not the required
-`docling-layout-heron` directory. The official `docling-tools models
-download-hf-repo` command was attempted in a temporary directory and failed on
-the workstation's corporate self-signed TLS certificate. TLS verification was
-not bypassed, and no model artifacts were copied into the repository.
+The current workstation has no approved remote hard adapter. A disposable
+development artifact download was attempted only to document the boundary and
+failed on the corporate self-signed TLS certificate. TLS verification was not
+bypassed, and no model artifacts were copied into the repository.
 
 ### Already verified
-- The existing slow Docling table/OCR tests remain available and use the
-  explicit development-only remote-download opt-in.
+- The existing slow Docling table/OCR tests remain available as disposable
+  development diagnostics only.
 - Default runtime behavior still rejects missing artifacts with a clear
   `HardExtractionError`.

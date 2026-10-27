@@ -47,7 +47,7 @@
                       (pure)                   (Pydantic dump)         (metrics, per-call)
 ```
 
-`full-vision` and `docling-only` pipelines reuse the same stages with a different **routing policy** (`always_vision`, `always_hard`) — see §6.6. They are not separate code paths.
+`full-vision` and `docling-only` pipelines reuse the same stages with a different **routing policy** (`always_vision`, `always_hard`) — see §6.6. They are not separate code paths. `docling-only` is a disposable development diagnostic; it is not an enterprise deployment mode.
 
 ## 3. Folder and file structure
 
@@ -367,8 +367,8 @@ class HardExtractor(Protocol):
 
 `DoclingExtractor` rules:
 - `import docling` **inside** `__init__`/first call only (lazy). One `DocumentConverter` instance per `DoclingExtractor`, created on first use, reused for all pages of the run (and across documents if the same `RunContext` is reused by the benchmark).
-- Pipeline options: OCR enabled with languages `en`, `de` when local OCR artifacts are available; table structure enabled; **picture description/classification off**; accelerator = CPU with `num_threads = cfg.hard.threads`; model artifacts must come from `cfg.hard.artifacts_path` in enterprise runtime. Remote downloads require an explicit development-only opt-in.
-- If local artifacts are not configured or do not exist, raise `HardExtractionError` before initializing the pipeline. The converter records the affected page as failed and continues; it never disables TLS verification or silently downloads models.
+- Docling is a disposable development/diagnostic adapter only. Enterprise PCs must not install, copy, provision, or download its OCR/layout model artifacts. Pipeline options remain CPU, table structure enabled, and **picture description/classification off** when the adapter is explicitly exercised outside the enterprise runtime.
+- If the development adapter is unavailable, or if the enterprise runtime has no approved remote hard-processing adapter, raise `HardExtractionError` before initializing the pipeline. The converter records the affected page as failed and continues; it never disables TLS verification or suggests local model provisioning.
 - Page selection: preferred is Docling's page-range option of `convert(...)`; if unavailable in the installed version, create a temporary sub-PDF containing only routed pages (pypdfium2 `import_pages`) and keep a `sub_index -> original_page` map. Whichever is used, **map back to original page numbers**. Phase 0 records which one works.
 - Batch all routed pages of a document in **one** call where contiguous ranges allow, to amortise overhead; otherwise one call per contiguous range.
 - Map Docling items to `Block`: section headers → `heading` (level from Docling), text → `paragraph`, list items → `list`, tables → `table` (Markdown via Docling table export, `meta` holds rows/cols), pictures → handled by the image stage (no `figure` block created here, to avoid double work). `Provenance.source="docling"`, `bbox` copied if available.
@@ -416,7 +416,7 @@ Contract rules for every implementation:
 |----------|---------------|-----------------|--------------|
 | `tiered` | router | TEXT→fast, COMPLEX/SCANNED→hard | on (filter + describe) |
 | `full-vision` | all pages → vision | render page at `cfg.vision.page_dpi` (default 150) → `transcribe_page` → Markdown block(s) with `source="vision"` | **off** (page transcription already describes images; avoids double counting) |
-| `docling-only` | all pages → hard | Docling | on |
+| `docling-only` | all pages → hard | Docling development diagnostic only | on |
 | `baseline_current` (bench only) | external | black-box adapter, see §7.3 | n/a |
 
 A `Pipeline` is a small dataclass `(name, policy, images_enabled)`; `bench/pipelines.py` registers them. No subclassing.
@@ -507,14 +507,14 @@ The system is a **batch pipeline**, not a long-running service, so state is deli
 1. **Immutable data flows between stages.** Pydantic frozen models; stages return new objects. No stage mutates another's output.
 2. **`RunContext` is the only carrier of cross-cutting state.** Contains: `config` (frozen), `vision: VisionBackend`, `hard: HardExtractor`, `cache: DiskCache`, `metrics: MetricsCollector`, `clock` (injectable for tests), `logger`. Built once by `build_context()`; fakes are injected in tests by constructing the context manually.
 3. **The disk cache is the only persistent state** (`.doc2md_cache/`, §11). Keys are content-addressed; entries are immutable JSON written atomically (write to temp file in same directory, `os.replace`). No locking needed for single-process use; concurrent writers of the same key are harmless (same content).
-4. **Heavy objects are owned by their adapter and created lazily:** Docling `DocumentConverter` (expensive model load) inside `DoclingExtractor`; HTTP client inside `KelpieVisionBackend`. Both are closed via `RunContext.close()` / context manager.
+4. **Heavy objects are owned by their adapter and created lazily:** the optional development Docling `DocumentConverter` (expensive model load) stays inside `DoclingExtractor`; the HTTP client for approved remote services stays inside its adapter. Both are closed via `RunContext.close()` / context manager.
 5. **Concurrency model:**
    - Page loop: **sequential** (pdfplumber page objects are not thread-safe and Docling on CPU is already multi-threaded internally).
    - Vision calls (images, and pages in `full-vision`): **bounded `ThreadPoolExecutor`** (`vision.max_workers`, default 4; tune to what the local Kelpie model tolerates — Phase 0 records the safe value). Results are re-ordered by page/image index before assembly so output is deterministic.
    - `MetricsCollector` is thread-safe (a lock around appends).
 6. **Page-level failure isolation:** each page's extraction is wrapped; exceptions become `PageResult(status="failed", error=...)`. Image-level failures become `ImageRecord(status="failed")`.
 7. **Determinism:** fixed seeds in benchmark sampling, `temperature=0`, sorted iteration, no timestamps inside Markdown/JSON content (timestamps only in `run.json`/`env.json`).
-8. **Benchmark isolation:** each (doc, pipeline, rep) uses a fresh output dir and, when `cold_cache=true`, a fresh cache directory. The Docling model load happens once per process; the runner records a **warm-up run** separately so one-off load time does not pollute the first measurement (the load time is reported on its own line).
+8. **Benchmark isolation:** each (doc, pipeline, rep) uses a fresh output dir and, when `cold_cache=true`, a fresh cache directory. Any disposable development Docling load is measured separately and never treated as an enterprise runtime requirement.
 
 ## 9. Configuration
 
@@ -538,8 +538,7 @@ column_gutter_min_pt = 20
 engine = "docling"
 languages = ["en", "de"]
 threads = 4
-artifacts_path = ""            # enterprise runtime requires a local artifact directory
-allow_remote_download = false  # development/provisioning only; never the product default
+# No enterprise model/artifact path exists. Hard processing requires an approved remote adapter.
 
 [images]
 enabled = true
@@ -588,7 +587,7 @@ Exception hierarchy (`errors.py`): `Doc2MdError` ← `ConfigError`, `Unsupported
 |-----------|-----------|
 | File missing/unreadable/encrypted | `SourceError`, exit 1 (encrypted: message says password unsupported in v1) |
 | One page fails in fast or hard path | page `failed`, placeholder in Markdown, continue; warning in `run.json` |
-| Docling not installed or local artifacts unavailable but a page needs it | `HardExtractionError` for those pages with a clear install/provisioning hint; pages still marked failed, others continue |
+| Docling unavailable or no approved remote hard adapter exists | `HardExtractionError` for those pages with a clear enterprise-boundary message; pages still marked failed, others continue |
 | Kelpie unreachable | image stage: images marked `failed`, document completes, warning; `full-vision` pipeline: exit 4 |
 | Kelpie transient error | retry with backoff; then failed record |
 | Invalid config | `ConfigError`, exit 2, message names the key |

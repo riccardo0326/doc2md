@@ -33,7 +33,7 @@ sample-specific branches or replacing the tiered architecture.
 
 ## Suggestions (non-blocking)
 - The unstructured-demo corpus still needs a follow-up quality pass for complex
-  multi-column reading order, list-shaped tables, and OCR provisioning.
+  multi-column reading order, list-shaped tables, and the approved remote hard adapter.
 
 ## Approved for git
 [x] Human approved commit and push.

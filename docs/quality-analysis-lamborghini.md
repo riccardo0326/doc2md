@@ -28,8 +28,8 @@ Observed results:
 - The five complex pages are pages 7, 8, 9, 11, and 22, all for
   `irregular_table`.
 - The fresh text-only conversion completes in about 2 seconds, but all five
-  complex pages are recorded as failed because local Docling artifacts are not
-  provisioned.
+  complex pages are recorded as failed because no approved remote hard adapter
+  is configured for the enterprise runtime.
 - The fresh default conversion also completes, but the page-1 logo is saved
   and receives an image-description failure placeholder because Kelpie is not
   configured in that environment.
@@ -40,19 +40,19 @@ Observed results:
   five-minute command limit. The fix work must leave mypy both error-free and
   terminating.
 
-The configured enterprise behavior is intentional: Docling refuses to download
-models by default. A controlled development run with
-`hard.allow_remote_download=true` converted page 7 through Docling and returned
-a 5-row, 2-column table, confirming that the hard adapter itself can handle the
-merged table when its artifacts are available. This opt-in is not a production
-default.
+The configured enterprise behavior is intentional: local Docling/OCR model
+execution and model downloads are outside the enterprise product boundary. A
+previous disposable development run converted page 7 through Docling and
+returned a 5-row, 2-column table, but that evidence is not an enterprise
+deployment path. The supported product path requires an approved remote hard
+adapter; until it exists, hard-page failures remain isolated and explicit.
 
 ## Findings
 
 ### F1 - Recoverable complex pages become empty failures (high)
 
-`src/doc2md/api.py` dispatches every non-`TEXT` page to Docling. When
-`DoclingExtractor` raises because artifacts are missing, the page loop records a
+`src/doc2md/api.py` dispatches every non-`TEXT` page to the hard adapter. When
+no approved remote hard adapter is available, the page loop records a
 failed page and emits only a placeholder. The PDF still has a text layer on all
 five pages. Direct calls to the existing fast extractor recover substantial
 content on pages 7, 8, 9, and 22, including rectangular table data; page 11
@@ -99,7 +99,7 @@ normalization in `normalize.py`.
 ### F4 - Irregular table detection is useful, but extraction loses the fallback
 
 `signals.py` marks pages 7, 8, 9, 11, and 22 as irregular because pdfplumber
-returns merged cells as blank cells. That is a valid reason to prefer Docling;
+returns merged cells as blank cells. That is a valid reason to prefer the hard adapter;
 lowering `router.table_none_ratio` makes all these pages `TEXT`, but produces
 wide best-effort tables with empty columns and is not a reliable fix.
 
@@ -107,8 +107,8 @@ wide best-effort tables with empty columns and is not a reliable fix.
 but it rejects a one-row table and the API never calls it after a hard-path
 failure. The targeted fix is to retain recoverable cell text, annotate
 simplification for merged cells, and use the explicit fallback only when
-Docling is unavailable. When Docling is provisioned, its 2-column result remains
-the preferred output.
+the hard adapter is unavailable. If a disposable development Docling run is
+available, its result is diagnostic only and not an enterprise requirement.
 
 ### F5 - Decorative logo passes the absolute image filter (medium)
 
@@ -144,10 +144,10 @@ Git.
 4. `task-004`: generic decorative-image filtering and vision degradation checks.
 5. `task-005`: reusable external quality run and Markdown checks.
 
-Provisioning Docling artifacts remains a prerequisite for measuring the normal
-hard path and should be done before claiming final table fidelity. The fallback
-is for continuity and development ergonomics, not a substitute for Docling in
-the enterprise path.
+An approved remote hard adapter remains a prerequisite for claiming enterprise
+scanned/OCR and high-fidelity complex-table support. The fallback is for
+continuity and development ergonomics, not a substitute for that supported
+remote service.
 
 ## Explicit non-goals
 
@@ -172,7 +172,7 @@ python scripts/check_quality.py --source <external-source.pdf> --reference <exte
 
 The report must distinguish these cases:
 
-- normal Docling extraction with locally provisioned artifacts;
-- explicit development-only remote Docling extraction;
+- normal extraction through the approved remote hard adapter;
+- disposable development-only Docling extraction, if separately available;
 - transparent pdfplumber fallback for text-backed complex pages;
 - an actual page with no usable extraction, which remains failed.

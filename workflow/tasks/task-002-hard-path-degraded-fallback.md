@@ -1,9 +1,9 @@
-# task-002 - Preserve Text When the Hard Path Is Unavailable
+# task-002 - Preserve Text When the Remote Hard Path Is Unavailable
 
 ## What to build
-Keep Docling as the preferred extractor for `COMPLEX` and `SCANNED` pages, but
-add a transparent degraded fallback for a complex page that still has a usable
-text layer when the hard extractor raises an artifact/provisioning failure.
+Keep the approved remote hard adapter as the preferred extractor for `COMPLEX`
+and `SCANNED` pages, but add a transparent degraded fallback for a complex page
+that still has a usable text layer when the hard adapter is unavailable.
 Reuse the existing pdfplumber extractor, mark the page method and warning
 accurately, and leave textless scanned pages failed. Improve best-effort GFM
 rendering for merged or one-row tables so recoverable cells are not silently
@@ -12,14 +12,14 @@ Docling-level table fidelity.
 
 ## Why
 The supplied PDF has five complex pages with recoverable text, but the current
-enterprise environment has no local Docling artifacts. The API currently turns
+enterprise environment has no approved remote hard adapter. The API currently turns
 each such page into a failure and drops all page content.
 
 ## Relevant files
 
 Read before starting:
 - `src/doc2md/api.py` - page failure isolation and hard-path dispatch.
-- `src/doc2md/converters/pdf/hard.py` - artifact/provisioning error boundary.
+- `src/doc2md/converters/pdf/hard.py` - hard-adapter availability boundary.
 - `src/doc2md/converters/pdf/fast.py` - table rendering and fallback extraction.
 - `src/doc2md/models.py` - allowed methods and warning fields.
 - `docs/decisions.md` - failure-isolation and artifact-boundary decisions.
@@ -47,11 +47,11 @@ Modify:
 
 ## Edge cases to handle
 - When the fallback returns no blocks: preserve the original page failure and error.
-- When Docling raises a non-provisioning extraction error: do not silently mask it unless the approved policy explicitly includes that class.
+- When the remote hard adapter raises a non-availability extraction error: do not silently mask it unless the approved policy explicitly includes that class.
 - When a fallback table has blank cells: never invent repeated cell values.
 
 ## Do not touch
-- The default enterprise rule that remote Docling downloads are disabled.
+- The enterprise rule that local models and model downloads are unsupported.
 - Page routing thresholds as a workaround for missing artifacts.
 
 ## Definition of done
@@ -77,4 +77,4 @@ Deviations from spec (if any):
 - The fallback is an explicit degraded mode for digital `COMPLEX` pages only; Docling remains preferred and scanned pages still fail when unavailable.
 
 Suggestions for follow-up (do not act on these):
-- Provision enterprise Docling artifacts and compare the fallback output with normal Docling output on the external corpus.
+- Integrate the approved remote hard adapter and compare its output with the fallback on the external corpus.

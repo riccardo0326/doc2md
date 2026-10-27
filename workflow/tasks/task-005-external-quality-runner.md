@@ -43,7 +43,7 @@ Modify:
 - [ ] The runner validates the sidecar schema and page provenance.
 - [ ] Synthetic tests are offline and contain no confidential text or PDF.
 - [ ] The supplied PDF can be checked by passing its path at runtime, with no source-specific code.
-- [ ] The report makes clear whether Docling artifacts and real Kelpie are available.
+- [ ] The report makes clear whether the approved remote hard adapter and real Kelpie are available.
 
 ## Edge cases to handle
 - When no reference is supplied: report intrinsic conversion checks only.

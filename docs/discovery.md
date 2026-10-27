@@ -18,8 +18,10 @@ is sent as base64 data URLs.
 
 Phase 0 is signed off with the documented A3 sample exception. Phases 1 and 2
 are complete; the remaining real-document requirement applies before benchmark
-work. Docling hard-path artifacts are an enterprise provisioning prerequisite,
-not a runtime download.
+work. Local OCR/layout/model artifacts are **not** an enterprise provisioning
+option: corporate PCs cannot install, copy, or download them. Docling evidence
+below is disposable development evidence only; enterprise hard processing must
+use an approved remote adapter or report an isolated page failure.
 
 ## Environment
 
@@ -41,9 +43,10 @@ The Phase 0 packages were installed into the temporary environment
 `C:\Users\rp99480\AppData\Local\Temp\opencode\doc2md-phase0-venv`; the
 repository was not modified by that installation.
 
-`tesseract` is not installed on this workstation. The enterprise hard path
-therefore requires pre-provisioned Docling artifacts; runtime OCR/model
-downloads are outside the supported conversion perimeter.
+`tesseract` is not installed on this workstation. Local OCR/layout model
+execution is outside the enterprise product perimeter. Runtime model downloads
+and artifact provisioning on corporate PCs are prohibited; the supported
+enterprise solution must be a remote approved hard-processing adapter.
 
 ## PDF And Docling
 
@@ -79,9 +82,10 @@ page numbering and the configured OCR/table options.
 
 ### Conversion Smoke Test
 
-A synthetic two-page PDF was generated in the temporary directory. Docling
-downloaded its model artifacts from Hugging Face and converted both pages on
-CPU successfully.
+A synthetic two-page PDF was generated in a temporary disposable environment.
+A historical Docling smoke run converted both pages on CPU. This is diagnostic
+evidence only and is not an enterprise deployment path or a model-installation
+recommendation.
 
 | Measurement | Result |
 |---|---:|
@@ -297,18 +301,19 @@ into doc2md without an explicit licensing/security decision.
 
 ## Model Catalog Assessment
 
-| Deployment name found in the reference | Intended role | Vision-capable | Locally hosted | Evidence status |
+| Deployment name found in the reference | Intended role | Vision-capable | Service-hosted behind Kelpie | Evidence status |
 |---|---|---:|---:|---|
-| `gpt-6-luna-gwc` | catalog chat deployment | not tested | `azure-gwc`, not accepted as local | proxy catalog |
-| `gpt-5.6-luna-gwc` | current chat default in reference | not tested | `azure-gwc`, not accepted as local | proxy catalog |
-| `DARE-NoCloud-Nova` | text/judge candidate | **no**: image probe returned 400 | `vllm-qwen3-8-flash-next`, local candidate | live probe |
-| `DARE-NoCloud-Helios` | vision candidate | **yes**: image probe completed | `vllm-qwen3-8-27b`, local candidate | live probe |
+| `gpt-6-luna-gwc` | catalog chat deployment | not tested | remote service | proxy catalog |
+| `gpt-5.6-luna-gwc` | current chat default in reference | not tested | remote service | proxy catalog |
+| `DARE-NoCloud-Nova` | text/judge candidate | **no**: image probe returned 400 | remote Kelpie service | live probe |
+| `DARE-NoCloud-Helios` | vision candidate | **yes**: image probe completed | remote Kelpie service | live probe |
 | `qwen3-embedding` | embeddings, expected 1024 dimensions | no | not applicable | static config |
 
 Recommended split, subject to confirmation: `DARE-NoCloud-Helios` for vision and
-`DARE-NoCloud-Nova` for the text judge. Nova can judge extracted text but cannot
-receive page images; Helios should be used for image-aware judging if that is a
-requirement.
+`DARE-NoCloud-Nova` for the text judge. Both are remote service deployments
+accessed through Kelpie; no model files are installed on the enterprise PC.
+Nova can judge extracted text but cannot receive page images; Helios should be
+used for image-aware judging if that is a requirement.
 
 ## Other Phase 0 Items
 
@@ -354,9 +359,8 @@ allow-list. The human accepted this as a documented Phase 0 exception on
 
 Use a thin native adapter in `src/doc2md/vision/kelpie.py` after sign-off:
 
-- use the authenticated local proxy as the primary transport on the EDAG
-  workstation, with the direct `kelpie-sdk` transport retained as the reference
-  deployment option;
+- use the approved authenticated Kelpie service/proxy as the primary remote
+  transport; no model is installed on the EDAG workstation;
 - depend on `openai` and keep the proxy/service-account choice behind the thin
   adapter; do not depend on `ai4tc_webapp` or its LangChain wrapper;
 - create the proxy client lazily and normalize its base URL to `/openai/v1`;
@@ -401,18 +405,6 @@ inside the configured artifact tree. The official command
 `docling-tools models download-hf-repo` was attempted in a temporary directory
 and failed because the workstation corporate TLS chain presents a self-signed
 certificate. TLS verification was not disabled. No model artifacts or sample
-PDFs were added to the repository. The scanned OCR acceptance remains blocked
-until the enterprise artifact bundle is provisioned through the approved
-machine setup.
-
-## Follow-up hard-path verification (2026-10-27)
-
-The existing Hugging Face cache contains the Docling TableFormer artifacts but
-does not contain the required `docling-project/docling-layout-heron` directory
-inside the configured artifact tree. The official command
-`docling-tools models download-hf-repo` was attempted in a temporary directory
-and failed because the workstation corporate TLS chain presents a self-signed
-certificate. TLS verification was not disabled. No model artifacts or sample
-PDFs were added to the repository. The scanned OCR acceptance remains blocked
-until the enterprise artifact bundle is provisioned through the approved
-machine setup.
+PDFs were added to the repository. Scanned OCR remains unsupported on the
+enterprise PC until an approved remote hard-processing adapter is available;
+no local artifact bundle will be provisioned.

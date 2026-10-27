@@ -67,5 +67,5 @@ def test_quality_runner_distinguishes_intentional_hard_page_failure(tmp_path: Pa
 
     assert not report.passed
     assert report.failed_pages == [1]
-    assert report.environment["docling_artifacts_configured"] is False
+    assert report.environment["enterprise_hard_adapter_configured"] is False
     assert any("failed pages" in error for error in report.errors)

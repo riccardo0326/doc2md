@@ -76,15 +76,16 @@ print(result.markdown_path, result.stats.vision_tokens_total)
 ## 5. Constraints
 
 ### 5.1 Environment
-- Runs on an EDAG Windows or Linux PC (**assume Windows paths must work**; use `pathlib` everywhere). `pip`/`uv` allowed, Hugging Face model download allowed, **CPU only**.
+- Runs on an EDAG Windows or Linux PC (**assume Windows paths must work**; use `pathlib` everywhere). `pip`/`uv` may install Python packages, **CPU only**.
 - Python version: determined in Phase 0 (target ≥ 3.11).
-- LLM access **only through Kelpie**, and only through **models that run locally on the EDAG server** (no external APIs, no public LLM endpoints). Credentials come from environment variables, never from files in the repo.
+- Enterprise PCs must not host, install, copy, provision, or download OCR/layout/LLM model artifacts. This is an explicit product boundary, not a missing setup step.
+- LLM access is **only through Kelpie**, using approved service-hosted models reachable through the corporate network. No model runs locally on the enterprise PC, and no public external API is used. Credentials come from environment variables, never from files in the repo.
 
 ### 5.2 Data confidentiality
 - Sample PDFs from Oz/Hannes and all outputs are confidential. They live in `samples/` and `out/`, both in `.gitignore`.
 - Tests use only **synthetic PDFs generated in code** or public-domain PDFs committed deliberately as small fixtures.
-- Disable third-party telemetry (`HF_HUB_DISABLE_TELEMETRY=1`, `DO_NOT_TRACK=1`); no network calls except package/model download (Phase 0/4) and Kelpie.
-- Enterprise runtime machines must not depend on external model downloads at conversion time. Heavy model artifacts used by Docling must be provisioned locally; an unavailable artifact is an isolated hard-page failure, not a reason to disable TLS or abort the document.
+- Disable third-party telemetry (`HF_HUB_DISABLE_TELEMETRY=1`, `DO_NOT_TRACK=1`); no network calls except package installation and approved Kelpie traffic.
+- Enterprise runtime machines must not depend on, install, or provision model artifacts. Docling/OCR local-model execution is outside the supported enterprise product. If no approved remote hard-processing adapter is available, the affected hard page is an isolated, clearly reported failure; TLS must never be disabled.
 - Benchmark reports shared with stakeholders contain metrics and short anonymised excerpts only, unless the human says otherwise.
 
 ### 5.3 Licensing
@@ -108,7 +109,7 @@ print(result.markdown_path, result.stats.vision_tokens_total)
 
 **FR3 — Fast path.** `TEXT` pages: extract with pdfplumber, reconstruct reading order, headings (heuristic by font size), paragraphs, lists, simple tables → Markdown. Normalise ligatures (ﬁ ﬂ ﬀ ﬃ ﬄ ﬅ ﬆ), soft hyphens and line-break hyphenation **without hard-coded character special cases elsewhere**.
 
-**FR4 — Hard path.** `COMPLEX` and `SCANNED` pages: converted by Docling (layout analysis, table structure, OCR en+de), **only for those pages**, producing Markdown blocks with the same data model as the fast path.
+**FR4 — Hard path.** `COMPLEX` and `SCANNED` pages use a replaceable hard-processing adapter. The enterprise implementation must be a separately approved remote adapter reachable through the corporate service boundary. The Docling adapter is disposable development/diagnostic code only and is not an enterprise runtime prerequisite; if no supported adapter is available, the page fails in isolation with provenance and a clear reason.
 
 **FR5 — Image handling.** Extract embedded images from every page; skip images below configurable thresholds (min width/height/area, extreme aspect ratio, exact duplicates by hash); save kept images to `images/`; send them to the Kelpie vision model for a description; insert the description **inline** in the Markdown next to an image link. Descriptions are cached.
 
@@ -136,14 +137,14 @@ Each phase ends with: tests green, `ruff` + `mypy`/`pyright` clean, `docs/decisi
 Produce `docs/discovery.md` answering every item below with evidence (command output, short notes). **The agent stops here for human sign-off.**
 
 - [ ] Python version, `uv`/`pip` availability, Windows vs Linux, CPU cores, RAM.
-- [ ] Install `pdfplumber`, `docling`, `pypdfium2`; verify the Docling API on CPU with locally provisioned artifacts. Runtime model downloads are not an enterprise prerequisite; record missing-artifact/TLS limitations, time per page, RAM, and installed versions.
+- [ ] Install the permitted Python packages. Docling may be inspected only in a disposable development environment; do not provision or install OCR/layout model artifacts on an enterprise PC. Record the unsupported hard-path boundary, adapter/API observations, TLS restrictions, and performance evidence.
 - [ ] **Kelpie discovery — from the existing reference implementation.** An EDAG project that already integrates Kelpie is checked out locally at `C:\Users\rp99480\dev\ai4tc_webapp` (outside this repo). Treat it as **read-only reference**: never modify it, never commit anything from it, never copy secrets/`.env` values. The agent must:
   1. Locate the Kelpie client code (search for `kelpie` case-insensitively in source, config, docs and env templates) and summarise in `docs/discovery.md`: file paths, how it is called (HTTP OpenAI-compatible, proprietary REST, or SDK), base URL and auth mechanism (names of env vars/config keys only, **no values**), how models are selected, request/response shape for text and for **image + text** inputs, whether and where **token usage** is returned, timeouts/retries/rate-limit handling, max image size.
-  2. List the models the project uses or configures, and mark which are **vision-capable and locally hosted**.
+  2. List the approved Kelpie service deployments the project uses or configures, and mark which are vision-capable. Do not classify model files as locally hosted on the enterprise PC.
   3. **Verify it works**: write a minimal standalone script (`scripts/kelpie_probe.py`, in this repo) that reproduces one text call and one image+text call using the same convention; run it; record request/response shape (redacted) and observed latency/token usage in `docs/kelpie-example.md`. If it fails, stop and ask the human.
   4. Recommend and record in `docs/decisions.md` how `KelpieVisionBackend` will reuse it: **reimplement a thin client following the same convention (default)**, import it, or copy a small part. Copying code requires the human's confirmation that internal reuse is allowed; the reference project's dependencies must not be pulled into this one without a license check.
   5. Note any quirks found (special headers, proxy settings, certificate handling, message format for images such as base64 data URLs).
-- [ ] Pick the default vision model (and, if different, the judge model) from the local ones. Record context window, observed latency.
+- [ ] Pick the default vision model (and, if different, the judge model) from the approved Kelpie service catalog. Record context window and observed latency; do not install model files locally.
 - [ ] **Current system as baseline:** the existing EDAG software **will be handed to Riccardo next week**; it is not available during Phases 0–6. Phase 0 only records this as pending. When it arrives: how to run it on a file (CLI, API, script), what it outputs, where its token usage can be read (ask Amro if unclear), then complete the `baseline_current` adapter (Phase 7). Until then the benchmark runs without `baseline_current`, using `full-vision` as the in-house baseline.
 - [ ] Obtain the sample set from Oz/Hannes. Target ≥ 6 documents: digital text-heavy, table-heavy, figure-heavy, scanned, EN and DE, at least one with many images. Record page counts. Place under `samples/` (git-ignored).
 - [ ] `pip-licenses` report saved to `docs/licenses.md`; confirm no forbidden licenses.
@@ -172,8 +173,8 @@ Acceptance: `docs/discovery.md` complete; human replies "go".
 - Acceptance: synthetic fixtures (text, table with merged cells, image-heavy page, scanned page made by rasterising a text page) classify as expected; thresholds overridable via config and CLI `--set router.min_chars=...`; classification is pure and unit-tested with signal dictionaries (no PDF needed for most tests).
 - Demo: `doc2md inspect` on a mixed fixture shows 3 different classes.
 
-### Phase 4 — Hard path with Docling
-- `DoclingExtractor` converts **only the routed pages** (page range or sub-PDF; see ARCHITECTURE §6.3), CPU, OCR `en+de` when local OCR artifacts are provisioned, table structure on, Docling's own picture description **off** (we do images ourselves). Runtime model downloads are disabled by default; missing artifacts fail only the affected page with a clear provisioning message.
+### Phase 4 — Optional development hard-path adapter
+- `DoclingExtractor` converts **only the routed pages** (page range or sub-PDF; see ARCHITECTURE §6.3) in a disposable development environment. It is not an enterprise runtime dependency and must not trigger model installation or downloads on corporate PCs. Missing model artifacts fail only the affected page with a clear unsupported-runtime message.
 - Docling output mapped into the common `Block` model with `source="docling"` and correct page numbers (original page numbers, not sub-PDF numbers).
 - Lazy import; single converter instance per run; page results cached.
 - Acceptance: a synthetic scanned page yields its text; a table fixture yields a Markdown table with the right cell count; `import doc2md` + converting a text-only PDF does not import `docling` (test via `sys.modules`); page numbers in JSON equal original page numbers for non-contiguous routed pages (e.g. pages 2 and 5).
@@ -208,7 +209,7 @@ Acceptance: `docs/discovery.md` complete; human replies "go".
 - `doc2md bench review-sheet <run_dir>` selects a **stratified sample of pages** (default 30: 10 per class, fewer if not available, fixed random seed) and writes a CSV/Markdown review sheet showing for each page the rendered page image path and the output of each pipeline **blind-labelled** (A/B/C, shuffled with seed, mapping saved separately).
 - Rubric (0–2 per criterion): text fidelity, special characters/umlauts, table fidelity, figure/image description usefulness, reading order. Defined in `bench/rubric.md`.
 - `doc2md bench judge <run_dir>` runs an LLM-as-judge via Kelpie (judge model from Phase 0, text+page image if vision-capable) with the same rubric and a fixed prompt; outputs JSON scores per page/pipeline.
-- `doc2md bench report` merges manual and judge scores; reports agreement between them on the overlapping sample (e.g. Spearman or simple % agreement) and **explicitly states the limits of the judge** (local model, possible bias towards its own style).
+- `doc2md bench report` merges manual and judge scores; reports agreement between them on the overlapping sample (e.g. Spearman or simple % agreement) and **explicitly states the limits of the judge** (approved remote model, possible style bias).
 - Acceptance: review sheet generation is deterministic with a seed; unblinding map round-trips; judge parser handles malformed model output (returns `judge_error`, never crashes); merged report golden-file test.
 - Demo: generate a review sheet from fixture run outputs.
 
@@ -216,7 +217,7 @@ Acceptance: `docs/discovery.md` complete; human replies "go".
 - Run the benchmark on the complete local corpus: all permitted PDFs in `samples/`, all committed synthetic PDFs used by the test suite, and every PDF discovered under the read-only cloned reference repository `C:\Users\rp99480\dev\ai4tc_webapp` when present. The real EDAG OCR baseline is explicitly **out of scope** for this phase; compare `tiered` with `full-vision` and leave an integration seam for a parallel manual comparison with the existing OCR software.
 - `docs/FINDINGS.md`: method, corpus manifest, results tables, charts (optional), **recommendation vs go/no-go criteria (section 8)** adapted to the available comparisons, explicit baseline exclusion, risks, and what to do next (e.g. add the EDAG adapter, docx/xlsx/eml converters, bounding boxes, image classifier).
 - Packaging: `pyproject.toml` with extras `[hard]` (docling) and `[bench]`; `README.md` (install, usage, library API); `THIRD_PARTY_NOTICES.md`; version `0.1.0`.
-- Acceptance: fresh virtualenv `pip install .[hard,bench]` works; README examples run; the corpus discovery command is deterministic and does not copy confidential PDFs; FINDINGS cites the exact run directory and versions used, or clearly records an environment block when Kelpie/Docling artifacts or external PDFs are unavailable.
+- Acceptance: fresh virtualenv `pip install .[hard,bench]` works for development tooling; README examples run; the corpus discovery command is deterministic and does not copy confidential PDFs; FINDINGS cites the exact run directory and versions used, or clearly records an environment block when the approved remote hard adapter or external PDFs are unavailable.
 
 ## 8. Success criteria and go/no-go (proposed values only — to be reviewed by Riccardo, then confirmed with Amro and Oz before Phase 9)
 
@@ -226,7 +227,7 @@ Measured on the Oz/Hannes sample set, cold cache, same Kelpie vision model for a
 |-----------|-----------------------------|
 | Parsing tokens (Kelpie input+output) | `tiered` ≥ **50 % lower** than `baseline_current` and than `full-vision` on the whole set |
 | Quality | Mean rubric score of `tiered` ≥ **95 %** of `baseline_current`; no single category (text, tables, figures, special chars) more than **10 %** worse |
-| Time (CPU) | Total wall time per document no worse than **1.5×** `baseline_current` (Docling on CPU is slow; this checks it is not prohibitive) |
+| Time (CPU) | Total wall time per document no worse than **1.5×** `baseline_current` when comparing supported enterprise adapters; development-only Docling timings are reported separately |
 | Robustness | 0 crashes; failed pages < 2 % |
 | Special characters | 0 occurrences of fl/fi ligature artefacts in `tiered` output of the sample set |
 
@@ -257,13 +258,13 @@ Timeline expectation from the call: Riccardo estimated **about one week** for a 
 | A7 | Project/package name | **Closed: `doc2md`** (project folder `doc2md`) | — |
 | A8 | Whether the vision model and judge model are the same | Same unless Phase 0 shows a better local option | Phase 0 |
 | A9 | Whether benchmark excerpts may be shared outside the team | No: metrics and anonymised excerpts only | Oz/Hannes |
-| A10 | Whether Docling model artifacts may be downloaded at runtime | No: provision local artifacts; remote download is development/provisioning-only | Phase 0/4 |
+| A10 | Whether OCR/layout/model artifacts may be installed or downloaded on an enterprise PC | **No: local model execution and provisioning are out of scope.** Use an approved remote hard-processing adapter; otherwise isolate the page failure. | Human enterprise-runtime decision |
 
 ## 11. Glossary
 
 - **Page class:** `TEXT`, `COMPLEX`, `SCANNED` (FR2).
-- **Fast path:** pdfplumber extraction. **Hard path:** Docling (layout/OCR/tables).
+- **Fast path:** pdfplumber extraction. **Hard path:** replaceable layout/OCR/table processing adapter; Docling is development-only and not an enterprise runtime dependency.
 - **Vision backend:** component that sends an image + prompt to a vision LLM through Kelpie.
-- **Kelpie:** EDAG's internal LLM-call service, with some locally hosted models.
+- **Kelpie:** EDAG's internal service boundary for approved remote model calls; model files are not installed on the enterprise PC.
 - **Provenance:** page + block id (and optional bbox) attached to every piece of extracted content.
 - **Baseline current:** the existing EDAG screenshot-to-text engine. **Full-vision:** our re-implementation of the same idea for controlled comparison.

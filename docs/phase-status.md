@@ -6,7 +6,7 @@
 | 1 | Complete | 4 tests, CLI/API, provenance sidecar, deterministic outputs | `phase-1` |
 | 2 | Complete | 21 tests, normalization and real ligature fixture | `phase-2` |
 | 3 | Complete | 34 default tests, `inspect`, signals and routing | `phase-3` |
-| 4 | Complete within enterprise perimeter | Docling table/page-range tests; local artifacts required; OCR download skipped by TLS boundary | `phase-4` |
+| 4 | Complete as development adapter | Docling table/page-range tests; local model execution is outside enterprise scope; OCR measurements await an approved remote hard adapter | `phase-4` |
 | 5 | Complete | 40 default tests, FakeVisionBackend, image filtering/dedupe, real Kelpie probe | `phase-5` |
 | 6 | Complete with local-environment exception | FR3 enrichment, three pipelines, JSON cache, no-cache, derived call/token metrics; 46 default tests | `phase-6` |
 | 7 | Complete with baseline exception | Benchmark suite loader, cold-cache runner, exact results CSV, deterministic report; 50 default tests | `phase-7` |
@@ -15,10 +15,10 @@
 
 ## Accepted Constraints
 
-- The current corpus includes every provisioned local sample and committed
+- The current corpus includes every permitted sample and committed
   synthetic PDF; the cloned reference repository currently contributes no PDFs.
-- Docling/OCR artifacts must be provisioned locally; runtime downloads are outside the product perimeter.
-- Scanned OCR is unavailable until those local artifacts are provisioned.
+- Local Docling/OCR model execution and runtime downloads are outside the enterprise product perimeter.
+- Scanned OCR is unavailable until an approved remote hard-processing adapter is integrated.
 
 ## Remaining Product Work
 
@@ -51,7 +51,7 @@
 - The real EDAG OCR baseline is intentionally excluded from Phase 9 and will be
   tested in parallel by the human using the same discovered PDF corpus.
 - The cloned reference repository currently contains no PDF files; discovery
-  remains dynamic so later provisioned PDFs are included without copying them.
+  remains dynamic so later permitted PDFs are included without copying them.
 - Offline benchmark smoke run: `bench_runs/phase9-corpus/20261023-133515/`.
 - Packaging wheel build passed; real Kelpie/Docling quality measurements remain
   environment-dependent and are not claimed by the offline smoke results.

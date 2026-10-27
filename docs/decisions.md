@@ -20,7 +20,7 @@ baseline must be verified before their concrete integrations are implemented.
 
 - `tiered` uses the router: `TEXT` uses pdfplumber; `COMPLEX` and `SCANNED`
   use Docling.
-- `SCANNED` pages use Docling OCR with `en+de`.
+- `SCANNED` pages use the configured hard adapter. Docling OCR is development-only; enterprise PCs use an approved remote hard-processing adapter or record an isolated failure.
 - `full-vision` sends every page to vision and disables the image stage.
 - `docling-only` sends every page to Docling, extracts and saves images, but
   never calls vision. Saved images are linked without descriptions and are
@@ -307,9 +307,11 @@ common `Block` model with `source="docling"`.
 original page number in provenance. Keeping the converter inside the adapter
 avoids importing or loading Docling for text-only conversions.
 
-**Environment note:** OCR integration is implemented and tested, but the local
-RapidOCR model download is currently blocked by the workstation's corporate TLS
-certificate chain; the slow OCR test records this as an environment skip.
+**Environment note:** OCR integration is implemented behind the replaceable hard
+adapter, but local OCR/model execution is outside the enterprise product
+boundary. The workstation's corporate TLS policy also prevents model downloads;
+the slow OCR test records this as an environment skip. Enterprise support waits
+for an approved remote hard-processing adapter.
 
 ## ADR-025: Phase 5 vision transport and image identity
 
@@ -334,19 +336,18 @@ required by FR3.
 yet a semantically rich document representation. This is product work distinct
 from the completed Phase 5 image/vision pipeline.
 
-## ADR-024: Enterprise Docling artifact boundary
+## ADR-024: Enterprise no-local-model boundary
 
-**Decision:** Runtime Docling model downloads are outside the enterprise
-product perimeter. `DoclingExtractor` requires a local `hard.artifacts_path` by
-default; remote downloads are available only through an explicit
-`allow_remote_download=true` setting for controlled development or provisioning.
-Missing local artifacts fail the affected hard page without aborting the
-document. OCR for scanned pages is not a guaranteed capability until OCR
-artifacts are provisioned locally.
+**Decision:** OCR, layout, and LLM model files are out of scope on enterprise
+PCs. They must not be installed, copied, provisioned, or downloaded there.
+Docling remains a disposable development diagnostic only. Enterprise hard pages
+require an approved remote adapter through the corporate service boundary; until
+that adapter exists, affected pages fail in isolation with an explicit runtime
+boundary message.
 
-**Reason:** The target corporate machines reject the model-download TLS chain
-and do not have a local Tesseract alternative. A production conversion must
-never depend on an unverified external download or silently disable TLS.
+**Reason:** The target corporate machines reject model-download TLS and cannot
+host local model artifacts. A production conversion must never depend on local
+model installation, bypass TLS, or silently download models.
 
 ## ADR-022: Phase 3 routing boundary
 
@@ -391,8 +392,9 @@ uses Docling for every page and saves images without vision calls.
 
 **Reason:** Keeping cache state and operational metrics at adapter boundaries
 prevents stale usage totals and keeps benchmark measurements comparable. The
-Docling adapter continues to reject missing local artifacts unless the explicit
-controlled-development remote-download opt-in is set.
+optional development Docling adapter is never an enterprise runtime
+requirement; hard-page availability is reported through the approved remote
+adapter boundary.
 
 ## ADR-029: Phase 7 benchmark isolation
 
@@ -430,10 +432,10 @@ response must never invalidate the rest of a quality run.
 
 ## ADR-031: Phase 9 corpus and baseline scope
 
-**Decision:** The Phase 9 benchmark corpus is assembled from permitted local
+**Decision:** The Phase 9 benchmark corpus is assembled from permitted external
 PDFs, committed synthetic fixtures, and every PDF discovered beneath the
 read-only reference repository `C:\Users\rp99480\dev\ai4tc_webapp` when such
-files are provisioned. Discovery records paths and SHA-256 values without
+files are available. Discovery records paths and SHA-256 values without
 copying PDF bytes into this repository.
 
 The real EDAG OCR software is explicitly outside the Phase 9 implementation and
@@ -466,10 +468,11 @@ layer and the hard extractor raises `HardExtractionError`, run the existing
 pdfplumber fast extractor as a degraded fallback. Keep the original
 `page_class="COMPLEX"`, set the page method to `pdfplumber`, and record the
 hard-path error in a `hard_path_fallback` warning. A `SCANNED` page never uses
-this fallback and remains failed when its hard path fails. Docling remains the
-preferred method whenever it succeeds.
+this fallback and remains failed when its hard path fails. An approved remote
+hard adapter remains the enterprise preferred method; Docling is only a
+disposable development diagnostic.
 
-**Reason:** Missing or unavailable Docling artifacts must not discard text that
+**Reason:** Missing or unavailable hard processing must not discard text that
 can be recovered deterministically from a digital page. The warning makes the
 quality trade-off and provisioning problem visible; it does not claim
 Docling-level layout or table fidelity.
@@ -529,5 +532,20 @@ column-sized horizontal gap form separate lines before reading-order assembly.
 **Reason:** The unstructured-demo corpus exposed generic parser failures that
 were independent of any one filename: empty-page OCR routing, premature
 column merging, borderless tables, lists inside cells, and binary/control
-artifacts. These rules preserve the existing data model and keep Docling as the
-preferred hard path without hardcoding sample content.
+artifacts. These rules preserve the existing data model and keep the hard path
+replaceable without hardcoding sample content or assuming local model files.
+
+## ADR-038: Enterprise model-hosting boundary
+
+**Decision:** The supported runtime is restricted to enterprise PCs with the
+same corporate network and TLS constraints as the development target. OCR,
+layout, and LLM model files must not be installed, copied, provisioned, or
+downloaded on those PCs. Model inference must cross an approved remote service
+boundary, currently Kelpie for vision; a future remote hard adapter is required
+for scanned/layout-heavy pages. Disposable development Docling experiments are
+not a product prerequisite or an enterprise setup instruction.
+
+**Reason:** The enterprise machine cannot install local models and rejects the
+model-download certificate chain. Treating provisioning as a future fix would
+misstate the supported product and repeatedly lead implementation work toward
+an impossible deployment path.

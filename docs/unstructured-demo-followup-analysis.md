@@ -23,8 +23,8 @@ semantic quality of a real Kelpie description.
 | `embedded-images-tables.pdf` | 1 `TEXT` page, 0 failed, 1 vision call | Partial | Image is handled, but the visible table is emitted as paragraphs rather than a GFM table. |
 | `multi-column-2p.pdf` | 2 `TEXT` pages, 0 failed | Fail for reading order | Text from both columns is interleaved before Markdown blocks are formed. |
 | `list-item-example.pdf` | 2 `COMPLEX` pages, pdfplumber fallback | Fail for structure | Each page becomes one simplified table block; list items are not emitted as Markdown lists. |
-| `layout-parser-paper-with-empty-pages.pdf` | 2 `TEXT`, 2 `SCANNED`, 2 failed | Fail for completeness | The two empty pages are routed to OCR and fail when Docling artifacts are absent. The text pages also contain control/glyph artifacts. |
-| `table-multi-row-column-cells.pdf` | 1 `SCANNED` page, 1 failed | Fail for completeness | The table is image-only and needs the provisioned OCR/hard path. |
+| `layout-parser-paper-with-empty-pages.pdf` | 2 `TEXT`, 2 `SCANNED`, 2 failed | Fail for completeness | The two empty pages are routed to OCR and fail because no approved remote hard adapter is configured. The text pages also contain control/glyph artifacts. |
+| `table-multi-row-column-cells.pdf` | 1 `SCANNED` page, 1 failed | Fail for completeness | The table is image-only and needs the approved remote hard adapter. |
 
 All generated sidecars validated and block provenance matched the containing
 page. The CLI returned success because normal mode isolates page failures;
@@ -36,13 +36,14 @@ the quality runner reports those failures explicitly.
 
 `table-multi-row-column-cells.pdf` has no text layer and no detectable table;
 the only recoverable content is in an image. Pages 2 and 3 of the LayoutParser
-sample are similarly textless. The current behavior is contract-consistent:
-Docling is the hard path and missing local artifacts produce isolated failures.
-It is not sufficient for a complete demo, however.
+sample are similarly textless. The current behavior is contract-consistent: the
+hard adapter is unavailable and the page failure is isolated. It is not
+sufficient for a complete demo, however.
 
-Fix boundary: provision the exact local Docling/OCR artifacts and verify the
-existing adapter on these pages. Do not enable silent runtime downloads or add
-a sample-specific vision branch.
+Fix boundary: use an approved remote hard-processing adapter through the
+corporate service boundary. Local Docling/OCR model installation, provisioning,
+and runtime downloads are permanently out of scope. Do not add a
+sample-specific vision branch.
 
 ### R2 - Truly empty pages are misclassified as scanned
 
@@ -77,7 +78,7 @@ Markdown rendering gap.
 
 Fix boundary: add a confidence-scored borderless-table detector using repeated
 baselines, aligned x-columns, and header/data consistency. Route uncertain
-cases to Docling when artifacts are available; otherwise preserve a clear
+cases to the approved remote hard adapter when available; otherwise preserve a clear
 best-effort structure instead of silently flattening it.
 
 ### R5 - Lists inside irregular table cells are flattened
@@ -107,8 +108,8 @@ must never contain NUL bytes.
 
 ## Priority Order
 
-1. Provision and verify local Docling/OCR artifacts. This unlocks the scanned
-   table and pages and establishes whether the existing hard adapter is enough.
+1. Integrate and verify an approved remote hard-processing adapter. This unlocks
+   the scanned table and pages without installing models on the PC.
 2. Fix empty-page routing so blank pages do not consume OCR or become failures.
 3. Fix column-aware line formation, because every later paragraph/list decision
    depends on correct lines.
@@ -119,7 +120,7 @@ must never contain NUL bytes.
 ## Acceptance Targets
 
 - `table-multi-row-column-cells.pdf`: one successful page with a structured table
-  after local OCR artifacts are provisioned; no placeholder in normal mode.
+  through the approved remote hard adapter; no placeholder in normal mode.
 - `layout-parser-paper-with-empty-pages.pdf`: empty pages complete with zero
   blocks; non-empty pages contain no NUL/control artifacts.
 - `multi-column-2p.pdf`: left-column text precedes right-column text for each
@@ -145,6 +146,5 @@ doc2md convert <sample.pdf> --out <desktop-out> --set vision.backend=fake --no-c
 python scripts/check_quality.py --source <sample.pdf> --out <desktop-out>
 ```
 
-Once artifacts are provisioned, repeat the scanned cases with the real hard
-path and record `docling_pages`, OCR status, and table cell counts in
-`run.json`.
+Once the remote hard adapter is available, repeat the scanned cases and record
+hard-adapter pages, OCR status, and table cell counts in `run.json`.

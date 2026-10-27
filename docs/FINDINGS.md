@@ -41,20 +41,20 @@ uses `FakeVisionBackend`, one repetition, and the three implemented pipelines:
 | `docling-only` | 13 | 2 | 0 | 0 | 0.133 |
 
 This is an offline smoke result, not a product quality claim: the real Kelpie
-model, provisioned Docling/OCR artifacts, external PDFs, and human scores were
-not available in this environment. No PDF bytes or external-model output is
+service, approved remote hard adapter, external PDFs, and human scores were not
+available in this environment. No PDF bytes or external-model output is
 committed.
 
 ## Recommendation
 
 The implementation is ready for a controlled benchmark run. A go/no-go product
-recommendation requires the real corpus, provisioned Docling/OCR artifacts,
+recommendation requires the real corpus, an approved remote hard adapter,
 Kelpie measurements, and the parallel EDAG OCR comparison. Until those inputs
 exist, no quality or savings threshold is claimed.
 
 ## Risks And Next Steps
 
-- Provision local Docling/OCR artifacts before scanned-page measurements.
+- Connect the approved remote hard adapter before scanned-page measurements.
 - Run the existing EDAG OCR software manually against the same manifest.
 - Record a cold-cache `tiered` versus `full-vision` run directory here.
 - Add a real `baseline_current` adapter only after its invocation and token

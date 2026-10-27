@@ -10,9 +10,10 @@ pip install .[bench]
 pip install .[hard]
 ```
 
-Use `.[dev]` for tests, Ruff, and mypy. Docling artifacts must be provisioned
-locally before hard-path conversion. Runtime model downloads are disabled by
-default.
+Use `.[dev]` for tests, Ruff, and mypy. The optional `[hard]` extra is for
+disposable development diagnostics only. Enterprise PCs must not install or
+download OCR/layout/model artifacts; supported hard processing requires an
+approved remote adapter, otherwise the affected page is reported as failed.
 
 ## Convert
 
@@ -34,14 +35,14 @@ print(result.stats.vision_tokens_total)
 
 ## Pipelines
 
-- `tiered`: pdfplumber for text pages, Docling only for hard pages.
+- `tiered`: pdfplumber for text pages, then the approved hard adapter for hard pages.
 - `full-vision`: renders and transcribes every page through Kelpie.
-- `docling-only`: sends every page to Docling and does not call vision.
+- `docling-only`: disposable development diagnostic; sends every page to Docling and does not call vision.
 
 ## Token Efficiency
 
-The tiered pipeline avoids vision on ordinary text pages, routes Docling only
-to complex/scanned pages, deduplicates images, caches descriptions, and records
+The tiered pipeline avoids vision on ordinary text pages, routes hard pages only
+to the configured hard adapter, deduplicates images, caches descriptions, and records
 input/output/total token usage in `run.json`. `full-vision` is the explicit
 comparison baseline. `--no-cache` is available for fair timing.
 

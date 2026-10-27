@@ -11,7 +11,7 @@ Reviewed: 2026-10-27
 | Borderless table detection | PASS | Synthetic borderless table becomes a structured GFM block. |
 | Lists in irregular cells | PASS | Fallback emits semantic list blocks instead of table-only output. |
 | Control/glyph sanitation | PASS | NUL/C0/C1 controls are removed and flagged as garbled. |
-| OCR hard path | PASS WITH NOTE | Code contract is unchanged, but local model provisioning remains blocked by corporate TLS. |
+| OCR hard path | PASS WITH NOTE | Code contract is unchanged, but enterprise hard processing requires an approved remote adapter that is not yet available. |
 
 ## Technical quality
 | Check | Result |
@@ -22,7 +22,7 @@ Reviewed: 2026-10-27
 | No debug statements | PASS |
 
 ## Blockers
-- Provisioned Docling/OCR verification remains environment-blocked; no TLS bypass was used.
+- Approved remote hard-adapter verification remains environment-blocked; no local model installation or TLS bypass was used.
 
 ## Suggestions (non-blocking)
 - Re-run the image-only table sample after the approved artifact bundle is installed.
