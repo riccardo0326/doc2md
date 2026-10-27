@@ -62,6 +62,16 @@ The real EDAG OCR baseline is intentionally outside the Phase 9 implementation
 scope. It can be run manually against the same corpus for parallel comparison.
 Review outputs and PDF bytes are not committed.
 
+For a local, path-driven Markdown quality check, pass any PDF and optionally
+an external reference Markdown. The runner uses the fake vision backend by
+default, writes output outside Git, validates the JSON sidecar, and reports
+Docling/Kelpie environment status without embedding sample paths:
+
+```bash
+python scripts/check_quality.py --source path/to/input.pdf --out path/to/check-out
+python scripts/check_quality.py --source path/to/input.pdf --out path/to/check-out --reference path/to/reference.md --json path/to/report.json
+```
+
 ## Output
 
 Conversion writes `<stem>.md`, `<stem>.json`, `run.json`, and kept images. The

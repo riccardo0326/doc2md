@@ -10,7 +10,7 @@ from ...config import FastConfig
 from ...models import Block, Provenance
 from .normalize import is_garbled, normalize_text
 
-_LIST_RE = re.compile(r"^(?:[-*+]\s+|\u2022\s+|\d+[.)]\s+)(.+)$")
+_LIST_MARKER_RE = re.compile(r"(?<!\S)(?:[-*+\u2022]|\d+[.)])\s+")
 
 
 @dataclass(frozen=True)
@@ -101,7 +101,9 @@ def _median(values: list[float]) -> float:
     return ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / 2
 
 
-def _table_markdown(rows: list[list[Any]]) -> tuple[str, str, dict[str, int]] | None:
+def _table_markdown(
+    rows: list[list[Any]],
+) -> tuple[str, str, dict[str, str | int | float | bool]] | None:
     clean_rows = [
         [normalize_text(str(cell or "")).replace("\n", " ").strip() for cell in row] for row in rows
     ]
@@ -114,6 +116,8 @@ def _table_markdown(rows: list[list[Any]]) -> tuple[str, str, dict[str, int]] | 
     if len(clean_rows[0]) < 2:
         return None
 
+    simplified = any(not value for row in clean_rows for value in row)
+
     def cell(value: str) -> str:
         return value.replace("|", "\\|")
 
@@ -122,6 +126,8 @@ def _table_markdown(rows: list[list[Any]]) -> tuple[str, str, dict[str, int]] | 
         "| " + " | ".join(cell(value) for value in header) + " |",
         "| " + " | ".join("---" for _ in header) + " |",
     ]
+    if simplified:
+        markdown.insert(0, "<!-- table: simplified -->")
     markdown.extend(
         "| " + " | ".join(cell(value) for value in row) + " |" for row in clean_rows[1:]
     )
@@ -129,13 +135,51 @@ def _table_markdown(rows: list[list[Any]]) -> tuple[str, str, dict[str, int]] | 
     return "\n".join(markdown), text, {"table_rows": len(clean_rows), "table_cols": len(header)}
 
 
-def _paragraph_groups(lines: list[_Line]) -> list[list[_Line]]:
+def _starts_list_item(text: str) -> bool:
+    return _LIST_MARKER_RE.match(text.strip()) is not None
+
+
+def _list_items(text: str) -> list[str] | None:
+    items: list[str] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        matches = list(_LIST_MARKER_RE.finditer(line))
+        if matches and matches[0].start() == 0:
+            for index, match in enumerate(matches):
+                end = matches[index + 1].start() if index + 1 < len(matches) else len(line)
+                item = line[match.end() : end].strip()
+                if item:
+                    items.append(item)
+            continue
+        if items:
+            items[-1] = f"{items[-1]} {line}"
+            continue
+        return None
+    return items or None
+
+
+def _is_heading_line(line: _Line, median_size: float, config: FastConfig) -> bool:
+    return bool(median_size and line.size >= median_size * config.heading_ratio)
+
+
+def _paragraph_groups(
+    lines: list[_Line], median_size: float, config: FastConfig
+) -> list[list[_Line]]:
     groups: list[list[_Line]] = []
     for line in lines:
         if not groups:
             groups.append([line])
             continue
         previous = groups[-1][-1]
+        if (
+            _is_heading_line(line, median_size, config)
+            or _is_heading_line(previous, median_size, config)
+            or (_starts_list_item(line.text) and not _starts_list_item(previous.text))
+        ):
+            groups.append([line])
+            continue
         gap = line.top - previous.bottom
         line_height = max(previous.bottom - previous.top, line.bottom - line.top, 0.1)
         if gap > line_height * 0.9:
@@ -154,9 +198,9 @@ def _block(
 ) -> Block:
     text = normalize_text("\n".join(line.text for line in lines), preserve_lines=True)
     flattened = " ".join(text.split())
-    list_items = [_LIST_RE.match(line.strip()) for line in text.splitlines() if line.strip()]
-    if list_items and all(match is not None for match in list_items):
-        markdown = "\n".join(f"- {match.group(1).strip()}" for match in list_items if match)
+    list_items = _list_items(text)
+    if list_items:
+        markdown = "\n".join(f"- {item}" for item in list_items)
         block_type = "list"
         level = None
     elif median_size and max(line.size for line in lines) >= median_size * config.heading_ratio:
@@ -215,7 +259,8 @@ def extract_page(
         if not any(top - 2 <= line.top <= bottom + 2 for top, bottom in table_ranges)
     ]
     elements: list[_Element] = [
-        _Element(group[0].top, "text", group) for group in _paragraph_groups(text_lines)
+        _Element(group[0].top, "text", group)
+        for group in _paragraph_groups(text_lines, median_size, effective_config)
     ]
     elements.extend(table_elements)
     elements.sort(key=lambda element: (element.top, 0 if element.kind == "text" else 1))

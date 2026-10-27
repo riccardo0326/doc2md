@@ -444,3 +444,75 @@ adapter can be added when its invocation and token reporting are available.
 **Reason:** This preserves confidentiality and keeps the final deliverable
 useful now, while avoiding invented claims about an unavailable external
 baseline.
+
+## ADR-032: External quality case boundary
+
+**Decision:** Keep user-supplied PDFs, reference Markdown, generated outputs,
+model responses, and token values outside the repository. Validate the supplied
+case through synthetic committed fixtures and a path-driven local quality
+runner. The external reference is a quality oracle for evaluation only; it is
+never read by production extraction logic and never drives a filename-,
+page-, or phrase-specific branch.
+
+**Reason:** The sample is confidential and the requested improvement must be a
+general PDF-to-Markdown capability, not a hardcoded reconstruction of one
+document. This boundary also keeps the default test suite offline and
+repeatable.
+
+## ADR-033: Text-backed hard-path fallback
+
+**Decision:** In the `tiered` pipeline, if a `COMPLEX` page has a usable text
+layer and the hard extractor raises `HardExtractionError`, run the existing
+pdfplumber fast extractor as a degraded fallback. Keep the original
+`page_class="COMPLEX"`, set the page method to `pdfplumber`, and record the
+hard-path error in a `hard_path_fallback` warning. A `SCANNED` page never uses
+this fallback and remains failed when its hard path fails. Docling remains the
+preferred method whenever it succeeds.
+
+**Reason:** Missing or unavailable Docling artifacts must not discard text that
+can be recovered deterministically from a digital page. The warning makes the
+quality trade-off and provisioning problem visible; it does not claim
+Docling-level layout or table fidelity.
+
+## ADR-034: Repeated margin filtering
+
+**Decision:** Enable a configurable fast-path filter that removes first/last
+pdfplumber blocks repeated across at least two pages and removes numeric footer
+blocks when numeric footers occur on multiple pages. If a repeated margin also
+appears on page 1, preserve the page-1 occurrence as cover metadata. The filter
+is disabled with `fast.strip_repeated_margins=false` and never examines text
+outside page margins.
+
+**Reason:** Running headers and printed page numbers are layout furniture in
+digital PDFs and otherwise pollute the Markdown. Requiring repeated margin
+position/content avoids hardcoding document titles or removing unique body
+text.
+
+## ADR-035: Relative image-area filtering
+
+**Decision:** Add `images.min_page_area_ratio`, defaulting to `0.02`, to the
+existing absolute image thresholds. An embedded image is marked
+`skip_reason="too_small"` when its PDF bounding-box area is below that fraction
+of a valid page area, unless it already fails an absolute/aspect/duplicate
+rule. Invalid page dimensions fall back to the absolute rules. The threshold
+is configurable and participates in the output configuration hash.
+
+**Reason:** Absolute pixel thresholds cannot distinguish a small decorative
+asset from a meaningful figure at a different page scale. A relative signal
+skips the observed decorative logo without naming it or depending on a page
+number, while keeping the existing figure and duplicate behavior.
+
+## ADR-036: Path-driven quality runner
+
+**Decision:** Add `scripts/check_quality.py` as a local-only evaluator that
+invokes the public API with the fake vision backend by default, validates the
+published Markdown/sidecar, reports environment capability flags, and accepts
+an optional external reference Markdown. Reference comparison uses normalized
+token coverage with a 90% warning/failure threshold rather than byte equality.
+Generated outputs and reports are supplied by the caller and remain outside
+the repository.
+
+**Reason:** Quality checks must be repeatable on confidential PDFs without
+committing those PDFs or coupling production code to one reference renderer.
+The fake backend keeps the default check offline while an explicit Kelpie
+option remains available for controlled environments.

@@ -3,15 +3,54 @@ from __future__ import annotations
 import importlib.util
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 
 from doc2md import Config, convert
-from doc2md.config import HardConfig, RouterConfig
+from doc2md.config import HardConfig, ImageConfig, RouterConfig
 from doc2md.converters.pdf.hard import DoclingExtractor
 from doc2md.errors import HardExtractionError
 
 DOC_LING_AVAILABLE = importlib.util.find_spec("docling") is not None
+
+
+class FailingHardExtractor:
+    name = "failing-docling"
+
+    def extract(self, source: Path, pages: list[int], context: object | None = None):
+        del source, pages, context
+        raise HardExtractionError("local Docling artifacts unavailable")
+
+
+def _merged_table_pdf(path: Path) -> None:
+    document = SimpleDocTemplate(str(path), pagesize=letter)
+    table = Table(
+        [
+            ["Classification", "Definition"],
+            ["Public", "Information without restrictions."],
+            [None, "The public use of company information requires approval."],
+        ],
+        colWidths=[1.5 * 72, 5 * 72],
+    )
+    table.setStyle(
+        TableStyle(
+            [
+                ("GRID", (0, 0), (-1, -1), 0.5, "black"),
+                ("SPAN", (0, 1), (0, 2)),
+            ]
+        )
+    )
+    document.build([table])
+
+
+def _one_row_table_pdf(path: Path) -> None:
+    document = SimpleDocTemplate(str(path), pagesize=letter)
+    table = Table([["Secret requirements", "The content must remain protected."]])
+    table.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, "black")]))
+    document.build([table])
 
 
 def test_docling_adapter_import_is_lazy() -> None:
@@ -34,6 +73,65 @@ def test_default_hard_path_fails_page_without_remote_download() -> None:
     assert page.status == "failed"
     assert page.error is not None
     assert "artifacts" in page.error.lower()
+
+
+def test_text_backed_hard_failure_falls_back_to_pdfplumber() -> None:
+    source = Path("tests/fixtures/synthetic/phase1_table.pdf")
+    config = Config(
+        images=ImageConfig(enabled=False),
+        router=RouterConfig(complex_image_ratio=0.0, image_page_min_chars=10_000),
+    )
+    context = SimpleNamespace(hard=FailingHardExtractor())
+
+    result = convert(source, config=config, context=context)
+
+    page = result.document.pages[0]
+    assert page.status == "ok"
+    assert page.page_class == "COMPLEX"
+    assert page.method == "pdfplumber"
+    assert any("hard_path_fallback" in warning for warning in page.warnings)
+    assert "| Item | Language | Status |" in result.markdown
+
+
+def test_scanned_hard_failure_does_not_use_text_fallback() -> None:
+    source = Path("tests/fixtures/synthetic/phase1_image_only.pdf")
+    config = Config(images=ImageConfig(enabled=False))
+    context = SimpleNamespace(hard=FailingHardExtractor())
+
+    result = convert(source, config=config, context=context)
+
+    page = result.document.pages[0]
+    assert page.status == "failed"
+    assert page.method is None
+    assert not any("hard_path_fallback" in warning for warning in page.warnings)
+
+
+def test_fallback_marks_merged_tables_as_simplified(tmp_path: Path) -> None:
+    source = tmp_path / "merged-table.pdf"
+    _merged_table_pdf(source)
+    config = Config(images=ImageConfig(enabled=False))
+    context = SimpleNamespace(hard=FailingHardExtractor())
+
+    result = convert(source, config=config, context=context)
+
+    assert result.document.pages[0].status == "ok"
+    assert "<!-- table: simplified -->" in result.markdown
+    assert "The public use of company information requires approval." in result.markdown
+
+
+def test_fallback_keeps_one_row_table_text(tmp_path: Path) -> None:
+    source = tmp_path / "one-row-table.pdf"
+    _one_row_table_pdf(source)
+    config = Config(
+        images=ImageConfig(enabled=False),
+        router=RouterConfig(complex_image_ratio=0.0, image_page_min_chars=10_000),
+    )
+    context = SimpleNamespace(hard=FailingHardExtractor())
+
+    result = convert(source, config=config, context=context)
+
+    assert result.document.pages[0].status == "ok"
+    assert "The content must remain protected." in result.markdown
 
 
 @pytest.mark.slow

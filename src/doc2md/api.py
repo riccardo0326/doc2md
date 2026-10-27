@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
-from typing import cast
+from typing import Literal, cast
 from uuid import uuid4
 
 import pdfplumber
@@ -16,9 +16,10 @@ from .config import Config, config_hash
 from .converters.pdf.fast import extract_page
 from .converters.pdf.hard import DoclingExtractor
 from .converters.pdf.images import collect_images, process_images
+from .converters.pdf.margins import strip_repeated_margins
 from .converters.pdf.router import classify
 from .converters.pdf.signals import compute_signals
-from .errors import ConfigError, ConversionFailed, SourceError
+from .errors import ConfigError, ConversionFailed, HardExtractionError, SourceError
 from .metrics import MetricsCollector
 from .models import (
     Block,
@@ -229,42 +230,65 @@ def convert(
                     else:
                         use_hard = pipeline == "docling-only" or page_class != "TEXT"
                         if use_hard:
+                            extraction_method: Literal["pdfplumber", "docling"] = "docling"
+                            fallback_warnings: list[str] = []
                             key = docling_cache_key(
                                 page_number,
                                 effective_config.hard.model_dump(mode="json"),
                                 _version("docling"),
                             )
-                            cached = cache.get("docling", key)
-                            if cached is not None:
-                                hard_blocks = _blocks_from_cache(cached)
-                                collector.record_cache(hit=True)
-                            else:
-                                collector.record_cache(hit=False)
-                                hard_started = time.perf_counter()
-                                hard_blocks = hard_extractor.extract(
-                                    source_path, [page_number], context=context
-                                )[page_number]
-                                collector.record_docling(time.perf_counter() - hard_started)
-                                cache.put(
-                                    "docling",
-                                    key,
-                                    {
-                                        "blocks": [
-                                            block.model_dump(mode="json") for block in hard_blocks
-                                        ]
-                                    },
+                            try:
+                                cached = cache.get("docling", key)
+                                if cached is not None:
+                                    hard_blocks = _blocks_from_cache(cached)
+                                    collector.record_cache(hit=True)
+                                else:
+                                    collector.record_cache(hit=False)
+                                    hard_started = time.perf_counter()
+                                    hard_blocks = hard_extractor.extract(
+                                        source_path, [page_number], context=context
+                                    )[page_number]
+                                    collector.record_docling(time.perf_counter() - hard_started)
+                                    cache.put(
+                                        "docling",
+                                        key,
+                                        {
+                                            "blocks": [
+                                                block.model_dump(mode="json")
+                                                for block in hard_blocks
+                                            ]
+                                        },
+                                    )
+                            except HardExtractionError as error:
+                                if not (
+                                    pipeline == "tiered"
+                                    and page_class == "COMPLEX"
+                                    and decision.signals.has_text_layer
+                                ):
+                                    raise
+                                hard_blocks = extract_page(
+                                    page, page_number, effective_config.fast
                                 )
+                                if not hard_blocks:
+                                    raise
+                                extraction_method = "pdfplumber"
+                                fallback_warnings = [
+                                    "hard_path_fallback: "
+                                    f"{type(error).__name__}: {error}"
+                                ]
+                                warnings.append(f"page {page_number} used hard_path_fallback")
+                            result_warnings = [
+                                "forced_pipeline:docling-only"
+                                if pipeline == "docling-only"
+                                else f"routed_to_hard_path:{','.join(decision.reasons)}"
+                            ]
                             result = PageResult(
                                 page=page_number,
                                 status="ok",
                                 page_class=page_class,
-                                method="docling",
+                                method=extraction_method,
                                 blocks=hard_blocks,
-                                warnings=[
-                                    "forced_pipeline:docling-only"
-                                    if pipeline == "docling-only"
-                                    else f"routed_to_hard_path:{','.join(decision.reasons)}"
-                                ],
+                                warnings=[*result_warnings, *fallback_warnings],
                             )
                         else:
                             result = PageResult(
@@ -317,6 +341,12 @@ def convert(
     finally:
         if pdfium_document is not None:
             pdfium_document.close()
+
+    if effective_config.fast.strip_repeated_margins:
+        page_results = strip_repeated_margins(
+            page_results,
+            min_repetitions=effective_config.fast.repeated_margin_min_pages,
+        )
 
     image_records = []
     if image_candidates:

@@ -8,6 +8,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
+from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from doc2md import Config, convert
@@ -80,6 +81,45 @@ def test_fast_path_preserves_semantic_reading_order(tmp_path: Path) -> None:
     assert blocks[2].markdown == "- first bullet\n- second bullet"
     assert "| Item | Value |" in blocks[3].markdown
     assert [block.provenance.page for block in blocks] == [1, 1, 1, 1]
+
+
+def test_fast_path_separates_heading_from_close_body_text(tmp_path: Path) -> None:
+    source = tmp_path / "close-heading.pdf"
+    document = canvas.Canvas(str(source), pagesize=letter)
+    document.setFont("Helvetica", 14)
+    document.drawString(72, 700, "Section heading")
+    document.setFont("Helvetica", 10)
+    document.drawString(72, 680, "Body text starts after the heading.")
+    document.drawString(72, 666, "The paragraph continues on the next line.")
+    document.drawString(72, 652, "The paragraph has enough body text.")
+    document.save()
+
+    config = Config(images=ImageConfig(enabled=False))
+    result = convert(source, config=config)
+
+    blocks = result.document.pages[0].blocks
+    assert [block.type for block in blocks] == ["heading", "paragraph"]
+    assert blocks[0].text == "Section heading"
+    assert blocks[1].text == (
+        "Body text starts after the heading. The paragraph continues on the next line. "
+        "The paragraph has enough body text."
+    )
+
+
+def test_fast_path_splits_inline_bullet_markers_into_list_items(tmp_path: Path) -> None:
+    source = tmp_path / "inline-bullets.pdf"
+    document = canvas.Canvas(str(source), pagesize=letter)
+    document.setFont("Helvetica", 10)
+    document.drawString(72, 700, "- first requirement - second requirement - third requirement")
+    document.save()
+
+    config = Config(images=ImageConfig(enabled=False))
+    result = convert(source, config=config)
+
+    blocks = result.document.pages[0].blocks
+    assert len(blocks) == 1
+    assert blocks[0].type == "list"
+    assert blocks[0].markdown == "- first requirement\n- second requirement\n- third requirement"
 
 
 def test_full_vision_uses_one_cached_page_call_per_page(text_pdf: Path, tmp_path: Path) -> None:

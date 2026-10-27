@@ -31,6 +31,8 @@ class FastConfig(BaseModel):
 
     heading_ratio: float = 1.25
     column_gutter_min_pt: float = 20.0
+    strip_repeated_margins: bool = True
+    repeated_margin_min_pages: int = Field(default=2, ge=2)
 
 
 class HardConfig(BaseModel):
@@ -52,6 +54,7 @@ class ImageConfig(BaseModel):
     min_width_px: int = 64
     min_height_px: int = 64
     min_area_px: int = 10000
+    min_page_area_ratio: float = Field(default=0.02, ge=0.0, le=1.0)
     max_aspect: float = 8.0
 
 
