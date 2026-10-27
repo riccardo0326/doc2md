@@ -7,6 +7,8 @@ from reportlab.pdfgen import canvas
 
 from doc2md import Config, convert
 from doc2md.config import FastConfig, ImageConfig
+from doc2md.converters.pdf.margins import strip_repeated_margins
+from doc2md.models import Block, PageResult, Provenance
 
 
 def _margin_fixture(path: Path) -> None:
@@ -49,3 +51,48 @@ def test_convert_can_keep_repeated_margins(tmp_path: Path) -> None:
 
     assert all("Running document title" in texts for texts in page_text)
     assert all(str(page_number) in texts for page_number, texts in enumerate(page_text, 1))
+
+
+def test_margin_filter_removes_repeated_vision_margins() -> None:
+    pages = [
+        PageResult(
+            page=page_number,
+            status="ok",
+            page_class="COMPLEX",
+            method="vision",
+            blocks=[
+                Block(
+                    block_id=f"p{page_number:04d}-b001",
+                    type="paragraph",
+                    markdown="Running document title",
+                    text="Running document title",
+                    provenance=Provenance(page=page_number, source="vision"),
+                ),
+                Block(
+                    block_id=f"p{page_number:04d}-b002",
+                    type="paragraph",
+                    markdown=f"Unique body {page_number}",
+                    text=f"Unique body {page_number}",
+                    provenance=Provenance(page=page_number, source="vision"),
+                ),
+                Block(
+                    block_id=f"p{page_number:04d}-b003",
+                    type="paragraph",
+                    markdown=str(page_number),
+                    text=str(page_number),
+                    provenance=Provenance(page=page_number, source="vision"),
+                ),
+            ],
+        )
+        for page_number in range(1, 4)
+    ]
+
+    filtered = strip_repeated_margins(pages)
+
+    assert [block.text for block in filtered[0].blocks] == [
+        "Running document title",
+        "Unique body 1",
+        "1",
+    ]
+    assert [block.text for block in filtered[1].blocks] == ["Unique body 2"]
+    assert [block.text for block in filtered[2].blocks] == ["Unique body 3"]

@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class RenderConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    page_markers: bool = True
+    page_markers: bool = False
     block_anchors: bool = False
 
 
@@ -33,6 +33,7 @@ class FastConfig(BaseModel):
     column_gutter_min_pt: float = 20.0
     strip_repeated_margins: bool = True
     repeated_margin_min_pages: int = Field(default=2, ge=2)
+    margin_zone_ratio: float = Field(default=0.12, gt=0.0, lt=0.5)
 
 
 class HardConfig(BaseModel):

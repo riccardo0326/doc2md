@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import re
 
 _LIGATURES = str.maketrans(
@@ -40,7 +41,8 @@ def _join_hyphenated_lines(text: str) -> str:
 
 def normalize_text(text: str, *, preserve_lines: bool = False) -> str:
     """Normalize PDF text without changing language-specific characters."""
-    normalized = text.translate(_LIGATURES).replace("\u00ad", "")
+    normalized = html.unescape(text).translate(_LIGATURES).replace("\u00ad", "")
+    normalized = normalized.replace("\u00a0", " ")
     normalized = _CONTROL_RE.sub(" ", normalized)
     normalized = _join_hyphenated_lines(normalized)
     if preserve_lines:

@@ -9,6 +9,7 @@ from ...config import HardConfig
 from ...errors import HardExtractionError
 from ...models import Block, BlockType, Provenance
 from ...vision.base import VisionBackend, VisionResult
+from .headings import normalize_heading
 from .normalize import normalize_text
 
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
@@ -46,14 +47,18 @@ def blocks_from_transcription(page: int, markdown: str) -> list[Block]:
         text = value.strip()
         if not text:
             return
+        rendered = text
+        normalized_level = level
+        if block_type == "heading":
+            rendered, text, normalized_level = normalize_heading(text, level or 2)
         index += 1
         blocks.append(
             Block(
                 block_id=f"p{page:04d}-b{index:03d}",
                 type=block_type,
-                markdown=text,
+                markdown=rendered,
                 text=text,
-                level=level,
+                level=normalized_level,
                 provenance=Provenance(page=page, source="vision"),
                 meta=meta or {},
             )

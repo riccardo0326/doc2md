@@ -7,7 +7,7 @@ from typer.testing import CliRunner
 
 from doc2md import Config, convert, inspect_pdf
 from doc2md.cli import app
-from doc2md.config import ImageConfig
+from doc2md.config import ImageConfig, RenderConfig
 
 runner = CliRunner()
 
@@ -52,7 +52,13 @@ def test_convert_keeps_blank_page_as_empty_success(tmp_path: Path) -> None:
     document.showPage()
     document.save()
 
-    result = convert(source, config=Config(images=ImageConfig(enabled=False)))
+    result = convert(
+        source,
+        config=Config(
+            images=ImageConfig(enabled=False),
+            render=RenderConfig(page_markers=True),
+        ),
+    )
 
     page = result.document.pages[0]
     assert page.status == "ok"

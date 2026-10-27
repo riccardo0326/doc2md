@@ -7,11 +7,23 @@ from typing import Any
 import pdfplumber
 
 from ...config import FastConfig
-from ...models import Block, BlockType, Provenance
+from ...models import Block, Provenance
+from .headings import normalize_heading
+from .margins import MarginSignatures, is_margin_line
 from .normalize import is_garbled, normalize_text
 from .signals import detect_borderless_table
 
 _LIST_MARKER_RE = re.compile(r"(?<!\S)(?:[-*+\u2022\u25cf]|\d+[.)])\s+")
+_SECTION_PREFIX_RE = re.compile(
+    r"^(?:(?:\d+(?:\.\d+)+|[IVXLCDM]+(?:\.[IVXLCDM]+)*|[A-Z](?:\.\d+)*)[.)]?|\d+|[IVXLCDM]+|[A-Z])(?:\s|$)",
+    re.IGNORECASE,
+)
+_SECTION_PREFIX_ONLY_RE = re.compile(
+    r"^(?:\d+(?:\.\d+)+|[IVXLCDM]+(?:\.[IVXLCDM]+)*|[A-Z](?:\.\d+)*|\d+|[IVXLCDM]+|[A-Z])[.)]?$",
+    re.IGNORECASE,
+)
+_SIMPLE_NUMERIC_HEADING_RE = re.compile(r"^\d+\s+", re.IGNORECASE)
+_TOC_LEADER_RE = re.compile(r"\.{3,}\s*\d+\s*$")
 
 
 @dataclass(frozen=True)
@@ -114,7 +126,8 @@ def _table_markdown(
     rows: list[list[Any]],
 ) -> tuple[str, str, dict[str, str | int | float | bool]] | None:
     clean_rows = [
-        [normalize_text(str(cell or "")).replace("\n", " ").strip() for cell in row] for row in rows
+        [normalize_text(str(cell or ""), preserve_lines=True).strip() for cell in row]
+        for row in rows
     ]
     if (
         len(clean_rows) < 2
@@ -128,7 +141,8 @@ def _table_markdown(
     simplified = any(not value for row in clean_rows for value in row)
 
     def cell(value: str) -> str:
-        return value.replace("|", "\\|")
+        lines = [line.strip() for line in value.splitlines() if line.strip()]
+        return "<br>".join(line.replace("|", "\\|") for line in lines)
 
     header = clean_rows[0]
     markdown = [
@@ -140,7 +154,9 @@ def _table_markdown(
     markdown.extend(
         "| " + " | ".join(cell(value) for value in row) + " |" for row in clean_rows[1:]
     )
-    text = "\n".join(" | ".join(row) for row in clean_rows)
+    text = "\n".join(
+        " | ".join(" ".join(value.splitlines()) for value in row) for row in clean_rows
+    )
     return "\n".join(markdown), text, {"table_rows": len(clean_rows), "table_cols": len(header)}
 
 
@@ -169,36 +185,26 @@ def _list_items(text: str) -> list[str] | None:
     return items or None
 
 
-def _table_blocks(rows: list[list[Any]]) -> list[tuple[BlockType, str, str]] | None:
-    cells = [normalize_text(str(cell or ""), preserve_lines=True) for row in rows for cell in row]
-    if not any(_LIST_MARKER_RE.search(cell) for cell in cells):
-        return None
-
-    blocks: list[tuple[BlockType, str, str]] = []
-    for cell in cells:
-        flattened = " ".join(cell.split())
-        if not flattened:
-            continue
-        matches = list(_LIST_MARKER_RE.finditer(flattened))
-        if not matches:
-            blocks.append(("paragraph", flattened, flattened))
-            continue
-        prefix = flattened[: matches[0].start()].strip()
-        if prefix:
-            blocks.append(("paragraph", prefix, prefix))
-        items: list[str] = []
-        for index, match in enumerate(matches):
-            end = matches[index + 1].start() if index + 1 < len(matches) else None
-            items.append(flattened[match.end() : end].strip())
-        items = [item for item in items if item]
-        if items:
-            markdown = "\n".join(f"- {item}" for item in items)
-            blocks.append(("list", markdown, " ".join(items)))
-    return blocks
+def _is_section_heading(text: str) -> bool:
+    flattened = " ".join(text.split())
+    return bool(
+        flattened
+        and not _TOC_LEADER_RE.search(flattened)
+        and _SECTION_PREFIX_RE.match(flattened)
+        and not _SECTION_PREFIX_ONLY_RE.fullmatch(flattened)
+    )
 
 
 def _is_heading_line(line: _Line, median_size: float, config: FastConfig) -> bool:
-    return bool(median_size and line.size >= median_size * config.heading_ratio)
+    if _starts_list_item(line.text):
+        return False
+    flattened = " ".join(line.text.split())
+    prefix_only = _SECTION_PREFIX_ONLY_RE.fullmatch(flattened) is not None
+    simple_numeric_heading = _SIMPLE_NUMERIC_HEADING_RE.match(flattened) is not None
+    return bool(
+        (median_size and line.size >= median_size * config.heading_ratio)
+        or (not prefix_only and not simple_numeric_heading and _is_section_heading(line.text))
+    )
 
 
 def _paragraph_groups(
@@ -210,9 +216,16 @@ def _paragraph_groups(
             groups.append([line])
             continue
         previous = groups[-1][-1]
+        current_heading = _is_heading_line(line, median_size, config)
+        previous_heading = _is_heading_line(previous, median_size, config)
+        heading_continuation = (
+            current_heading
+            and previous_heading
+            and not _is_section_heading(line.text)
+        )
         if (
-            _is_heading_line(line, median_size, config)
-            or _is_heading_line(previous, median_size, config)
+            (current_heading and not heading_continuation)
+            or (previous_heading and not heading_continuation)
             or (_starts_list_item(line.text) and not _starts_list_item(previous.text))
             or abs(line.x0 - previous.x0) >= config.column_gutter_min_pt
         ):
@@ -241,9 +254,22 @@ def _block(
         markdown = "\n".join(f"- {item}" for item in list_items)
         block_type = "list"
         level = None
-    elif median_size and max(line.size for line in lines) >= median_size * config.heading_ratio:
-        level = 1 if max(line.size for line in lines) >= median_size * 1.6 else 2
-        markdown = f"{'#' * level} {flattened}"
+    elif _is_heading_line(
+        _Line(
+            (),
+            lines[0].top,
+            lines[-1].bottom,
+            lines[0].x0,
+            flattened,
+            max(line.size for line in lines),
+        ),
+        median_size,
+        config,
+    ):
+        candidate_level = (
+            1 if median_size and max(line.size for line in lines) >= median_size * 1.6 else 2
+        )
+        markdown, flattened, level = normalize_heading(flattened, candidate_level)
         block_type = "heading"
     else:
         level = None
@@ -264,10 +290,24 @@ def extract_page(
     page: pdfplumber.page.Page,
     page_number: int,
     config: FastConfig | None = None,
+    margin_signatures: MarginSignatures | None = None,
 ) -> list[Block]:
     effective_config = config or FastConfig()
     lines = _word_lines(page, effective_config)
-    if not lines:
+    had_word_lines = bool(lines)
+    if lines and margin_signatures is not None and page_number != 1:
+        lines = [
+            line
+            for line in lines
+            if not is_margin_line(
+                line.top,
+                line.bottom,
+                line.text,
+                float(getattr(page, "height", 792.0)),
+                margin_signatures,
+            )
+        ]
+    if not lines and not had_word_lines:
         extracted = page.extract_text(x_tolerance=1, y_tolerance=3) or ""
         text = normalize_text(extracted, preserve_lines=True)
         lines = [
@@ -290,12 +330,7 @@ def extract_page(
         bbox = tuple(getattr(table, "bbox", (0.0, 0.0, 0.0, 0.0)))
         top = float(bbox[1])
         bottom = float(bbox[3])
-        cell_blocks = _table_blocks(rows)
-        table_elements.append(
-            _Element(top, "blocks", cell_blocks)
-            if cell_blocks is not None
-            else _Element(top, "table", (markdown, text, meta))
-        )
+        table_elements.append(_Element(top, "table", (markdown, text, meta)))
         table_ranges.append((top, bottom))
 
     if not detected_tables:
@@ -304,11 +339,8 @@ def extract_page(
             rendered = _table_markdown(borderless.rows)
             if rendered is not None:
                 markdown, text, meta = rendered
-                cell_blocks = _table_blocks(borderless.rows)
                 table_elements.append(
-                    _Element(borderless.top, "blocks", cell_blocks)
-                    if cell_blocks is not None
-                    else _Element(borderless.top, "table", (markdown, text, meta))
+                    _Element(borderless.top, "table", (markdown, text, meta))
                 )
                 table_ranges.append((borderless.top, borderless.bottom))
 
@@ -329,19 +361,6 @@ def extract_page(
         number = len(blocks) + 1
         if element.kind == "text":
             blocks.append(_block(page_number, number, element.value, median_size, effective_config))
-            continue
-        if element.kind == "blocks":
-            for block_type, markdown, text in element.value:
-                blocks.append(
-                    Block(
-                        block_id=f"p{page_number:04d}-b{len(blocks) + 1:03d}",
-                        type=block_type,
-                        markdown=markdown,
-                        text=text,
-                        provenance=Provenance(page=page_number, source="pdfplumber"),
-                        meta={"table_fallback": True},
-                    )
-                )
             continue
         markdown, text, meta = element.value
         blocks.append(

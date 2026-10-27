@@ -16,7 +16,7 @@ from .config import Config, config_hash
 from .converters.pdf.fast import extract_page
 from .converters.pdf.hard import DoclingExtractor, KelpieHardExtractor
 from .converters.pdf.images import collect_images, process_images
-from .converters.pdf.margins import strip_repeated_margins
+from .converters.pdf.margins import detect_repeated_margins, strip_repeated_margins
 from .converters.pdf.router import classify
 from .converters.pdf.signals import compute_signals
 from .errors import ConfigError, ConversionFailed, HardExtractionError, SourceError
@@ -183,6 +183,15 @@ def convert(
                 page_count=page_count,
             )
             selected_pages = _validate_pages(pages, page_count)
+            margin_signatures = (
+                detect_repeated_margins(
+                    pdf.pages,
+                    min_repetitions=effective_config.fast.repeated_margin_min_pages,
+                    zone_ratio=effective_config.fast.margin_zone_ratio,
+                )
+                if effective_config.fast.strip_repeated_margins
+                else None
+            )
             for page_number, page in enumerate(pdf.pages, start=1):
                 if page_number not in selected_pages:
                     result = PageResult(
@@ -308,7 +317,10 @@ def convert(
                                 ):
                                     raise
                                 hard_blocks = extract_page(
-                                    page, page_number, effective_config.fast
+                                    page,
+                                    page_number,
+                                    effective_config.fast,
+                                    margin_signatures,
                                 )
                                 if not hard_blocks:
                                     raise
@@ -339,7 +351,12 @@ def convert(
                                 status="ok",
                                 page_class=page_class,
                                 method="pdfplumber",
-                                blocks=extract_page(page, page_number, effective_config.fast),
+                                blocks=extract_page(
+                                    page,
+                                    page_number,
+                                    effective_config.fast,
+                                    margin_signatures,
+                                ),
                             )
                 except Exception as error:  # noqa: BLE001 - page failures are isolated
                     result = PageResult(
@@ -389,6 +406,7 @@ def convert(
         page_results = strip_repeated_margins(
             page_results,
             min_repetitions=effective_config.fast.repeated_margin_min_pages,
+            signatures=margin_signatures,
         )
 
     image_records = []

@@ -567,3 +567,21 @@ Docling for enterprise hard pages.
 keeps model inference on EDAG servers, preserves the tiered cost model for
 ordinary text pages, and reuses the discovered Kelpie API instead of inventing
 a second service or installing local model files.
+
+## ADR-040: Markdown layout-artifact handling
+
+**Decision:** Normalize HTML entities and non-breaking spaces at the shared text
+boundary. Detect repeated top and bottom margin lines from the cheap PDF text
+layer before fast-path semantic parsing, then defensively remove matching
+margin blocks from hard-path output. Repeated headers, footers, and numeric page
+footers are layout furniture and are not emitted as content blocks.
+
+Section headings at level two or deeper render as `##` regardless of numeric
+depth. Irregular-table fallback keeps cell content in a table representation
+instead of promoting cell bullets to document-level lists. Markdown page
+markers are opt-in; JSON page and block provenance remains authoritative.
+
+**Reason:** The quality run showed that running furniture contaminates heading
+and list inference, Kelpie can return `&nbsp;`, and flattening table cells
+creates misleading list structure. These rules improve consumer-facing
+Markdown without adding document-specific branches or removing provenance.

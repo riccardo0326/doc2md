@@ -77,8 +77,10 @@ python scripts/check_quality.py --source path/to/input.pdf --out path/to/check-o
 ## Output
 
 Conversion writes `<stem>.md`, `<stem>.json`, `run.json`, and kept images. The
-Markdown uses page markers, optional block anchors, GFM tables, and inline image
-descriptions. The JSON sidecar preserves page, block, and source provenance.
+Markdown uses optional page markers, optional block anchors, GFM tables, and
+inline image descriptions. Page markers are disabled by default to avoid layout
+noise; enable them with `--page-markers` or `render.page_markers=true`. The JSON
+sidecar preserves page, block, and source provenance.
 
 ## Development
 

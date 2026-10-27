@@ -113,7 +113,7 @@ print(result.markdown_path, result.stats.vision_tokens_total)
 
 **FR5 — Image handling.** Extract embedded images from every page; skip images below configurable thresholds (min width/height/area, extreme aspect ratio, exact duplicates by hash); save kept images to `images/`; send them to the Kelpie vision model for a description; insert the description **inline** in the Markdown next to an image link. Descriptions are cached.
 
-**FR6 — Provenance.** Every block in the JSON sidecar has `page` (1-based), `block_id`, `source` (`pdfplumber` | `docling` | `vision`), and optionally `bbox`. The Markdown contains page markers (`<!-- page: N -->`) and block anchors so a downstream summarizer can cite "page N, block X". Bounding boxes are **not required in v1** but the model has the field.
+**FR6 — Provenance.** Every block in the JSON sidecar has `page` (1-based), `block_id`, `source` (`pdfplumber` | `docling` | `vision`), and optionally `bbox`. The Markdown can include page markers (`<!-- page: N -->`) and block anchors for citation, but page markers are opt-in because they are layout noise for downstream Markdown consumers. JSON remains the authoritative page/block citation source. Bounding boxes are **not required in v1** but the model has the field.
 
 **FR7 — Failure isolation.** A failing page (exception, Kelpie timeout) never aborts the document: it is recorded with status `failed`, a placeholder is written in the Markdown, and conversion continues. `--strict` turns any failed page into a non-zero exit code.
 
@@ -156,7 +156,7 @@ Acceptance: `docs/discovery.md` complete; human replies "go".
 ### Phase 1 — Walking skeleton: text-only PDF → Markdown with page provenance
 - `doc2md convert in.pdf -o out/` works end to end for a **digital text PDF**, using only pdfplumber.
 - Produces `out/<stem>/<stem>.md`, `<stem>.json` (schema in ARCHITECTURE.md §5), `run.json`.
-- Markdown contains `<!-- page: N -->` markers; JSON blocks have `page` and `block_id`.
+- Markdown page markers are opt-in; JSON blocks always have `page` and `block_id`.
 - Python API `doc2md.convert()` returns `ConversionResult`.
 - Repo bootstrap in this phase: `pyproject.toml`, folder skeleton limited to what the phase uses, `.gitignore` (incl. `samples/`, `out/`, `bench_runs/`, `.doc2md_cache/`, `.env`), `AGENTS.md` (3–10 lines pointing to this spec and ARCHITECTURE.md plus the rules in section 0), `docs/decisions.md`, ruff/mypy/pytest configured.
 - Acceptance tests: synthetic 3-page PDF → expected paragraphs in order with the right page numbers; JSON validates against the Pydantic model; CLI exit code 0; re-run is deterministic (same output bytes).

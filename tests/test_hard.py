@@ -11,7 +11,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 
 from doc2md import Config, convert
 from doc2md.config import HardConfig, ImageConfig, RouterConfig
-from doc2md.converters.pdf.hard import DoclingExtractor
+from doc2md.converters.pdf.hard import DoclingExtractor, blocks_from_transcription
 from doc2md.errors import HardExtractionError
 
 DOC_LING_AVAILABLE = importlib.util.find_spec("docling") is not None
@@ -88,6 +88,21 @@ def test_default_hard_path_reports_kelpie_unavailability() -> None:
     assert "kelpie" in page.error.lower()
 
 
+def test_hard_headings_flatten_section_depth_and_decode_entities() -> None:
+    blocks = blocks_from_transcription(
+        2,
+        "## 2.2 Requirements\n\n### 2.2.1 Internal organization\n\n"
+        "#### 2.2.5.2 Password Generation\n\nB.1.2 &nbsp; IT Help Desk",
+    )
+
+    assert [(block.markdown, block.text, block.level) for block in blocks[:3]] == [
+        ("## 2.2 Requirements", "2.2 Requirements", 2),
+        ("## 2.2.1 Internal organization", "2.2.1 Internal organization", 2),
+        ("## 2.2.5.2 Password Generation", "2.2.5.2 Password Generation", 2),
+    ]
+    assert blocks[3].text == "B.1.2 IT Help Desk"
+
+
 def test_text_backed_hard_failure_falls_back_to_pdfplumber() -> None:
     source = Path("tests/fixtures/synthetic/phase1_table.pdf")
     config = Config(
@@ -156,10 +171,10 @@ def test_fallback_preserves_lists_inside_table_cells(tmp_path: Path) -> None:
     result = convert(source, config=config, context=context)
 
     blocks = result.document.pages[0].blocks
-    assert not any(block.type == "table" for block in blocks)
-    assert sum(block.type == "list" for block in blocks) == 4
-    assert any("- first item" in block.markdown for block in blocks)
-    assert any("- third item" in block.markdown for block in blocks)
+    assert any(block.type == "table" for block in blocks)
+    assert not any(block.type == "list" for block in blocks)
+    assert "- first item" in result.markdown
+    assert "- third item" in result.markdown
 
 
 @pytest.mark.slow

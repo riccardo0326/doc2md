@@ -31,9 +31,14 @@ def convert_command(
     set_values: list[str] = typer.Option([], "--set"),
     no_images: bool = typer.Option(False, "--no-images"),
     no_cache: bool = typer.Option(False, "--no-cache"),
+    page_markers: bool | None = typer.Option(None, "--page-markers/--no-page-markers"),
     strict: bool = typer.Option(False, "--strict"),
 ) -> None:
     config = with_overrides(Config(), set_values)
+    if page_markers is not None:
+        config = config.model_copy(
+            update={"render": config.render.model_copy(update={"page_markers": page_markers})}
+        )
     if no_images:
         config = config.model_copy(
             update={"images": config.images.model_copy(update={"enabled": False})}

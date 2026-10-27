@@ -86,9 +86,10 @@ doc2md/                              # repo root
 │  │     ├─ signals.py               # compute_signals(page) -> PageSignals   (pure given page object)
 │  │     ├─ router.py                # classify(signals, cfg) -> RouteDecision  (pure)
 │  │     ├─ fast.py                  # FastExtractor: pdfplumber page -> list[Block]
+│  │     ├─ headings.py              # shared heading-level normalization (pure)
 │  │     ├─ hard.py                  # HardExtractor protocol + DoclingExtractor (lazy import)
 │  │     ├─ images.py                # find, filter, hash, save images
-│  │     └─ normalize.py             # text normalisation (ligatures, hyphens, whitespace)   (pure)
+│  │     └─ normalize.py             # text normalisation (entities, ligatures, hyphens, whitespace) (pure)
 │  ├─ vision/
 │  │  ├─ base.py                     # VisionBackend protocol, VisionResult, Usage
 │  │  ├─ kelpie.py                   # KelpieVisionBackend (shaped by Phase 0 discovery)
@@ -266,7 +267,7 @@ class ConvertedDocument(BaseModel):
 
 ### 5.2 Markdown conventions (the citation contract)
 
-- Each page starts with `<!-- page: N -->` on its own line (config `render.page_markers`, default **on**).
+- Each page can start with `<!-- page: N -->` on its own line (config `render.page_markers`, default **off**). JSON remains the authoritative provenance output.
 - Each block is preceded by `<!-- block: p0003-b002 -->` only when `render.block_anchors` is on (default **off** in Markdown, always present in JSON). Rationale: anchors cost tokens; page markers are enough for page-level citation, and JSON gives block-level.
 - Tables use GFM pipe tables. Where a table cannot be rendered as GFM (merged cells), render the best-effort GFM plus a `<!-- table: simplified -->` comment.
 - Images: `![Figure p3-i01](images/p0003-i01.png)` followed by a blockquote `> **Image description (p3-i01):** …`.
@@ -540,6 +541,9 @@ image_page_min_chars = 400
 [fast]
 heading_ratio = 1.25
 column_gutter_min_pt = 20
+strip_repeated_margins = true
+repeated_margin_min_pages = 2
+margin_zone_ratio = 0.12
 
 [hard]
 engine = "docling-dev-only"        # enterprise target: Kelpie-backed hard path
