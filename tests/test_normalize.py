@@ -42,8 +42,13 @@ def test_normalize_removes_soft_hyphen_and_preserves_german_characters() -> None
     assert normalize_text("Straße Über­größe") == "Straße Übergröße"
 
 
+def test_normalize_removes_disallowed_control_characters() -> None:
+    assert normalize_text("di\x00cult\x01 text\twith\nspacing") == "di cult text with spacing"
+
+
 def test_garbled_cid_text_is_flagged() -> None:
     assert is_garbled("value (cid:12)(cid:45)")
+    assert is_garbled("di\x00cult")
     assert not is_garbled("Straße")
 
 

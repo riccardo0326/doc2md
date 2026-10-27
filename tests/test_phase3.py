@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from reportlab.pdfgen import canvas
 from typer.testing import CliRunner
 
-from doc2md import inspect_pdf
+from doc2md import Config, convert, inspect_pdf
 from doc2md.cli import app
+from doc2md.config import ImageConfig
 
 runner = CliRunner()
 
@@ -42,3 +44,19 @@ def test_inspect_cli_prints_classes_and_accepts_overrides(text_pdf: Path) -> Non
     assert result.exit_code == 0, result.stdout
     assert "SCANNED" in result.stdout
     assert "page" in result.stdout.lower()
+
+
+def test_convert_keeps_blank_page_as_empty_success(tmp_path: Path) -> None:
+    source = tmp_path / "blank.pdf"
+    document = canvas.Canvas(str(source))
+    document.showPage()
+    document.save()
+
+    result = convert(source, config=Config(images=ImageConfig(enabled=False)))
+
+    page = result.document.pages[0]
+    assert page.status == "ok"
+    assert page.page_class == "TEXT"
+    assert page.blocks == []
+    assert "<!-- page: 1 -->" in result.markdown
+    assert "failed" not in result.markdown

@@ -38,4 +38,19 @@ Modify:
 - [ ] Table cell counts and provenance are asserted in JSON.
 
 ## Status
-ready
+dev-complete
+
+### Dev notes
+Files created:
+- None.
+
+Files modified:
+- `src/doc2md/converters/pdf/signals.py` - added conservative aligned-row borderless-table detection.
+- `src/doc2md/converters/pdf/fast.py` - reuses the detected rows for GFM rendering.
+- `tests/test_phase6.py` - added a synthetic borderless table acceptance test.
+
+Deviations from spec (if any):
+- The detector is intentionally conservative and requires three numeric-bearing rows.
+
+Suggestions for follow-up (do not act on these):
+- Tune the confidence heuristic against additional borderless tables after the full corpus rerun.

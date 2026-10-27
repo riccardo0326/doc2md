@@ -64,6 +64,33 @@ def _semantic_pdf(path: Path) -> None:
     )
 
 
+def _two_column_pdf(path: Path) -> None:
+    document = canvas.Canvas(str(path), pagesize=letter)
+    document.setFont("Helvetica", 16)
+    document.drawString(72, 740, "Two column document")
+    document.setFont("Helvetica", 10)
+    document.drawString(72, 700, "Left column line one")
+    document.drawString(330, 700, "Right column line one")
+    document.drawString(72, 685, "Left column line two")
+    document.drawString(330, 685, "Right column line two")
+    document.save()
+
+
+def _borderless_table_pdf(path: Path) -> None:
+    document = canvas.Canvas(str(path), pagesize=letter)
+    rows = [
+        ("Name", "Value", "Status"),
+        ("Alpha", "10", "ready"),
+        ("Beta", "20", "ready"),
+        ("Gamma", "30", "blocked"),
+    ]
+    for index, row in enumerate(rows):
+        y = 700 - index * 16
+        for x, value in zip((72, 220, 320), row):
+            document.drawString(x, y, value)
+    document.save()
+
+
 def test_fast_path_preserves_semantic_reading_order(tmp_path: Path) -> None:
     source = tmp_path / "semantic.pdf"
     _semantic_pdf(source)
@@ -81,6 +108,37 @@ def test_fast_path_preserves_semantic_reading_order(tmp_path: Path) -> None:
     assert blocks[2].markdown == "- first bullet\n- second bullet"
     assert "| Item | Value |" in blocks[3].markdown
     assert [block.provenance.page for block in blocks] == [1, 1, 1, 1]
+
+
+def test_fast_path_keeps_same_baseline_columns_separate(tmp_path: Path) -> None:
+    source = tmp_path / "two-column.pdf"
+    _two_column_pdf(source)
+    config = Config(images=ImageConfig(enabled=False))
+
+    result = convert(source, config=config)
+    blocks = result.document.pages[0].blocks
+    texts = [block.text for block in blocks]
+
+    assert any(text == "Two column document" for text in texts)
+    assert all(not ("Left column" in text and "Right column" in text) for text in texts)
+    assert texts.index("Left column line one Left column line two") < texts.index(
+        "Right column line one Right column line two"
+    )
+
+
+def test_fast_path_detects_borderless_table(tmp_path: Path) -> None:
+    source = tmp_path / "borderless-table.pdf"
+    _borderless_table_pdf(source)
+    config = Config(images=ImageConfig(enabled=False))
+
+    result = convert(source, config=config)
+
+    page = result.document.pages[0]
+    tables = [block for block in page.blocks if block.type == "table"]
+    assert page.page_class == "COMPLEX"
+    assert page.status == "ok"
+    assert len(tables) == 1
+    assert "| Name | Value | Status |" in tables[0].markdown
 
 
 def test_fast_path_separates_heading_from_close_body_text(tmp_path: Path) -> None:

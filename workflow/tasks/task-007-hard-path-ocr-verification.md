@@ -36,4 +36,17 @@ Modify:
 - [ ] Ruff and mypy pass.
 
 ## Status
-ready
+blocked
+
+### Blocker
+The local Hugging Face cache contains TableFormer artifacts but not the required
+`docling-layout-heron` directory. The official `docling-tools models
+download-hf-repo` command was attempted in a temporary directory and failed on
+the workstation's corporate self-signed TLS certificate. TLS verification was
+not bypassed, and no model artifacts were copied into the repository.
+
+### Already verified
+- The existing slow Docling table/OCR tests remain available and use the
+  explicit development-only remote-download opt-in.
+- Default runtime behavior still rejects missing artifacts with a clear
+  `HardExtractionError`.

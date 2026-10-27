@@ -25,6 +25,7 @@ def signals(**changes: object) -> PageSignals:
 @pytest.mark.parametrize(
     ("page_signals", "expected", "reason"),
     [
+        (signals(chars=0, words=0, has_text_layer=False), "TEXT", "empty_page"),
         (signals(has_text_layer=False), "SCANNED", "no_text_layer"),
         (signals(chars=5, image_area_ratio=0.8), "SCANNED", "scan_like_page"),
         (signals(garbled_ratio=0.2), "COMPLEX", "garbled_text"),
@@ -45,6 +46,17 @@ def test_classify_uses_first_matching_route_rule(
 
 def test_classify_routes_missing_text_layer_to_scanned() -> None:
     decision = classify(signals(has_text_layer=False), RouterConfig(), page=1)
+
+    assert decision.page_class == "SCANNED"
+    assert "no_text_layer" in decision.reasons
+
+
+def test_classify_keeps_textless_page_with_content_signals_on_hard_path() -> None:
+    decision = classify(
+        signals(chars=0, words=0, has_text_layer=False, image_count=1, image_area_ratio=1.0),
+        RouterConfig(),
+        page=2,
+    )
 
     assert decision.page_class == "SCANNED"
     assert "no_text_layer" in decision.reasons

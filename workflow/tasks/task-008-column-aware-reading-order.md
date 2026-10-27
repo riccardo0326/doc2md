@@ -38,4 +38,18 @@ Modify:
 - [ ] No source-specific x coordinates, text, or page numbers are used.
 
 ## Status
-ready
+dev-complete
+
+### Dev notes
+Files created:
+- None.
+
+Files modified:
+- `src/doc2md/converters/pdf/fast.py` - keeps same-baseline words in separate lines and splits paragraph groups at column transitions.
+- `tests/test_phase6.py` - added a synthetic two-column regression.
+
+Deviations from spec (if any):
+- None.
+
+Suggestions for follow-up (do not act on these):
+- Re-run the multi-column corpus after borderless-table and glyph fixes to validate mixed scientific layouts.

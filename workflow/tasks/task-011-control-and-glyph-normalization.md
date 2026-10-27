@@ -36,4 +36,18 @@ Modify:
 - [ ] The LayoutParser sample's text pages contain no NUL/control bytes in the quality run.
 
 ## Status
-ready
+dev-complete
+
+### Dev notes
+Files created:
+- None.
+
+Files modified:
+- `src/doc2md/converters/pdf/normalize.py` - replaces disallowed C0/C1 controls with spaces and flags them as garbled.
+- `tests/test_normalize.py` - added NUL/control regressions.
+
+Deviations from spec (if any):
+- None.
+
+Suggestions for follow-up (do not act on these):
+- Review isolated font fragments remaining after normalization on multi-column research papers.

@@ -392,3 +392,27 @@ while the direct service-account path remains static-reference evidence.
 
 Human sign-off: `go` was given on 2026-10-22 with the A3 sample-set exception
 above. Four additional real documents remain required before benchmark work.
+
+## Follow-up hard-path verification (2026-10-27)
+
+The existing Hugging Face cache contains the Docling TableFormer artifacts but
+does not contain the required `docling-project/docling-layout-heron` directory
+inside the configured artifact tree. The official command
+`docling-tools models download-hf-repo` was attempted in a temporary directory
+and failed because the workstation corporate TLS chain presents a self-signed
+certificate. TLS verification was not disabled. No model artifacts or sample
+PDFs were added to the repository. The scanned OCR acceptance remains blocked
+until the enterprise artifact bundle is provisioned through the approved
+machine setup.
+
+## Follow-up hard-path verification (2026-10-27)
+
+The existing Hugging Face cache contains the Docling TableFormer artifacts but
+does not contain the required `docling-project/docling-layout-heron` directory
+inside the configured artifact tree. The official command
+`docling-tools models download-hf-repo` was attempted in a temporary directory
+and failed because the workstation corporate TLS chain presents a self-signed
+certificate. TLS verification was not disabled. No model artifacts or sample
+PDFs were added to the repository. The scanned OCR acceptance remains blocked
+until the enterprise artifact bundle is provisioned through the approved
+machine setup.

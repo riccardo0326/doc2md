@@ -516,3 +516,18 @@ the repository.
 committing those PDFs or coupling production code to one reference renderer.
 The fake backend keeps the default check offline while an explicit Kelpie
 option remains available for controlled environments.
+
+## ADR-037: Unstructured-demo parser fixes
+
+**Decision:** Treat pages with no text, images, or tables as successful empty
+`TEXT` pages; detect conservative borderless tables from aligned rows with
+numeric evidence; flatten list-bearing irregular table cells into semantic
+paragraph/list blocks; and replace disallowed C0/C1 control characters with
+spaces while marking them as garbled. Same-baseline words separated by a
+column-sized horizontal gap form separate lines before reading-order assembly.
+
+**Reason:** The unstructured-demo corpus exposed generic parser failures that
+were independent of any one filename: empty-page OCR routing, premature
+column merging, borderless tables, lists inside cells, and binary/control
+artifacts. These rules preserve the existing data model and keep Docling as the
+preferred hard path without hardcoding sample content.

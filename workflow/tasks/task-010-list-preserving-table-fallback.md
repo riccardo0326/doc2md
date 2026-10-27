@@ -34,4 +34,18 @@ Modify:
 - [ ] The list-item sample has no table-only page blocks in the quality run.
 
 ## Status
-ready
+dev-complete
+
+### Dev notes
+Files created:
+- None.
+
+Files modified:
+- `src/doc2md/converters/pdf/fast.py` - converts list-bearing irregular table cells into paragraph/list blocks.
+- `tests/test_hard.py` - added a synthetic list-in-table fallback test.
+
+Deviations from spec (if any):
+- List-bearing tables are flattened into ordered semantic blocks instead of forcing invalid nested GFM tables.
+
+Suggestions for follow-up (do not act on these):
+- Validate Docling's native list/table mapping once OCR/layout artifacts are available.

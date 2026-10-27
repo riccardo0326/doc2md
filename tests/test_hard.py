@@ -53,6 +53,19 @@ def _one_row_table_pdf(path: Path) -> None:
     document.build([table])
 
 
+def _list_table_pdf(path: Path) -> None:
+    document = SimpleDocTemplate(str(path), pagesize=letter)
+    table = Table(
+        [
+            ["Module A\n- first item\n- second item", "Module B\n- third item"],
+            ["Module C\n- fourth item", "Module D\n- fifth item"],
+        ],
+        colWidths=[3 * 72, 3 * 72],
+    )
+    table.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, "black")]))
+    document.build([table])
+
+
 def test_docling_adapter_import_is_lazy() -> None:
     assert "docling" not in sys.modules
 
@@ -132,6 +145,21 @@ def test_fallback_keeps_one_row_table_text(tmp_path: Path) -> None:
 
     assert result.document.pages[0].status == "ok"
     assert "The content must remain protected." in result.markdown
+
+
+def test_fallback_preserves_lists_inside_table_cells(tmp_path: Path) -> None:
+    source = tmp_path / "list-table.pdf"
+    _list_table_pdf(source)
+    config = Config(images=ImageConfig(enabled=False))
+    context = SimpleNamespace(hard=FailingHardExtractor())
+
+    result = convert(source, config=config, context=context)
+
+    blocks = result.document.pages[0].blocks
+    assert not any(block.type == "table" for block in blocks)
+    assert sum(block.type == "list" for block in blocks) == 4
+    assert any("- first item" in block.markdown for block in blocks)
+    assert any("- third item" in block.markdown for block in blocks)
 
 
 @pytest.mark.slow

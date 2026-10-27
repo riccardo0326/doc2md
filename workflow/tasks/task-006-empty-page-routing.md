@@ -37,4 +37,19 @@ Modify:
 - [ ] No sample-specific conditions are added.
 
 ## Status
-ready
+dev-complete
+
+### Dev notes
+Files created:
+- None.
+
+Files modified:
+- `src/doc2md/converters/pdf/router.py` - added generic `empty_page` routing before scanned detection.
+- `tests/test_router.py` - added empty-page and content-signal regression coverage.
+- `tests/test_phase3.py` - added blank-PDF end-to-end coverage.
+
+Deviations from spec (if any):
+- Empty pages retain the existing `TEXT` page class with zero blocks to avoid widening the page-class contract.
+
+Suggestions for follow-up (do not act on these):
+- Re-run the LayoutParser sample after the remaining parser and OCR tasks.
