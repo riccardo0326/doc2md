@@ -6,15 +6,20 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from doc2md import ConversionResult, convert
+from doc2md import Config, ConversionResult, convert
 from doc2md.cli import app
+from doc2md.config import RenderConfig
 from doc2md.models import ConvertedDocument
 
 runner = CliRunner()
 
 
 def test_convert_writes_markdown_and_provenance(text_pdf: Path, tmp_path: Path) -> None:
-    result = convert(text_pdf, tmp_path / "out")
+    result = convert(
+        text_pdf,
+        tmp_path / "out",
+        config=Config(render=RenderConfig(page_markers=True)),
+    )
 
     assert isinstance(result, ConversionResult)
     assert result.markdown_path == tmp_path / "out" / "fixture" / "fixture.md"
@@ -46,6 +51,20 @@ def test_convert_is_deterministic_for_content_outputs(text_pdf: Path, tmp_path: 
     assert first.json_path is not None
     assert second.json_path is not None
     assert first.json_path.read_bytes() == second.json_path.read_bytes()
+
+
+def test_page_markers_are_opt_in_and_json_provenance_remains(text_pdf: Path) -> None:
+    result = convert(text_pdf)
+
+    assert "<!-- page: " not in result.markdown
+    assert [block.provenance.page for page in result.document.pages for block in page.blocks] == [
+        1,
+        1,
+        2,
+        2,
+        3,
+        3,
+    ]
 
 
 def test_cli_convert_returns_zero_and_writes_outputs(text_pdf: Path, tmp_path: Path) -> None:

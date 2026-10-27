@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class RenderConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    page_markers: bool = True
+    page_markers: bool = False
     block_anchors: bool = False
 
 
@@ -31,14 +31,18 @@ class FastConfig(BaseModel):
 
     heading_ratio: float = 1.25
     column_gutter_min_pt: float = 20.0
+    strip_repeated_margins: bool = True
+    repeated_margin_min_pages: int = Field(default=2, ge=2)
+    margin_zone_ratio: float = Field(default=0.12, gt=0.0, lt=0.5)
 
 
 class HardConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    engine: str = "docling"
+    engine: str = "kelpie"
     languages: list[str] = Field(default_factory=lambda: ["en", "de"])
     threads: int = 4
+    page_dpi: int = 200
     artifacts_path: str | None = None
     ocr: bool = True
     allow_remote_download: bool = False
@@ -52,6 +56,7 @@ class ImageConfig(BaseModel):
     min_width_px: int = 64
     min_height_px: int = 64
     min_area_px: int = 10000
+    min_page_area_ratio: float = Field(default=0.02, ge=0.0, le=1.0)
     max_aspect: float = 8.0
 
 
@@ -59,7 +64,7 @@ class KelpieConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     base_url: str = ""
-    model: str = ""
+    model: str = "DARE-NoCloud-Helios"
 
 
 class VisionConfig(BaseModel):
@@ -69,6 +74,7 @@ class VisionConfig(BaseModel):
     max_workers: int = 1
     page_dpi: int = 150
     max_tokens: int = 800
+    transcribe_max_tokens: int = 1600
     temperature: float = 0.0
     timeout_s: float = 120.0
     max_retries: int = 3

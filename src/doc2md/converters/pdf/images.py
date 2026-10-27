@@ -97,10 +97,22 @@ def collect_images(
             continue
 
         area = width_px * height_px
+        page_width = float(getattr(page, "width", 0.0))
+        page_height = float(getattr(page, "height", 0.0))
+        relative_area: float | None = None
+        if page_width > 0 and page_height > 0 and {"x0", "x1", "y0", "y1"}.issubset(image):
+            image_area = max(0.0, float(image["x1"]) - float(image["x0"])) * max(
+                0.0, float(image["y1"]) - float(image["y0"])
+            )
+            relative_area = image_area / (page_width * page_height)
         if (
             width_px < config.min_width_px
             or height_px < config.min_height_px
             or area < config.min_area_px
+            or (
+                relative_area is not None
+                and relative_area < config.min_page_area_ratio
+            )
         ):
             candidates.append(
                 ImageCandidate(

@@ -6,7 +6,7 @@ from ..models import ConvertedDocument
 def render_markdown(
     document: ConvertedDocument,
     *,
-    page_markers: bool = True,
+    page_markers: bool = False,
     block_anchors: bool = False,
 ) -> str:
     lines: list[str] = []

@@ -47,7 +47,7 @@
                       (pure)                   (Pydantic dump)         (metrics, per-call)
 ```
 
-`full-vision` and `docling-only` pipelines reuse the same stages with a different **routing policy** (`always_vision`, `always_hard`) — see §6.6. They are not separate code paths.
+`full-vision` and `docling-only` pipelines reuse the same stages with a different **routing policy** (`always_vision`, `always_hard`) — see §6.6. They are not separate code paths. `docling-only` is a disposable development diagnostic; it is not an enterprise deployment mode.
 
 ## 3. Folder and file structure
 
@@ -86,9 +86,10 @@ doc2md/                              # repo root
 │  │     ├─ signals.py               # compute_signals(page) -> PageSignals   (pure given page object)
 │  │     ├─ router.py                # classify(signals, cfg) -> RouteDecision  (pure)
 │  │     ├─ fast.py                  # FastExtractor: pdfplumber page -> list[Block]
+│  │     ├─ headings.py              # shared heading-level normalization (pure)
 │  │     ├─ hard.py                  # HardExtractor protocol + DoclingExtractor (lazy import)
 │  │     ├─ images.py                # find, filter, hash, save images
-│  │     └─ normalize.py             # text normalisation (ligatures, hyphens, whitespace)   (pure)
+│  │     └─ normalize.py             # text normalisation (entities, ligatures, hyphens, whitespace) (pure)
 │  ├─ vision/
 │  │  ├─ base.py                     # VisionBackend protocol, VisionResult, Usage
 │  │  ├─ kelpie.py                   # KelpieVisionBackend (shaped by Phase 0 discovery)
@@ -266,7 +267,7 @@ class ConvertedDocument(BaseModel):
 
 ### 5.2 Markdown conventions (the citation contract)
 
-- Each page starts with `<!-- page: N -->` on its own line (config `render.page_markers`, default **on**).
+- Each page can start with `<!-- page: N -->` on its own line (config `render.page_markers`, default **off**). JSON remains the authoritative provenance output.
 - Each block is preceded by `<!-- block: p0003-b002 -->` only when `render.block_anchors` is on (default **off** in Markdown, always present in JSON). Rationale: anchors cost tokens; page markers are enough for page-level citation, and JSON gives block-level.
 - Tables use GFM pipe tables. Where a table cannot be rendered as GFM (merged cells), render the best-effort GFM plus a `<!-- table: simplified -->` comment.
 - Images: `![Figure p3-i01](images/p0003-i01.png)` followed by a blockquote `> **Image description (p3-i01):** …`.
@@ -359,6 +360,13 @@ Defaults (to be tuned in Phase 9 on real documents): `min_chars=50`, `min_chars_
 
 ### 6.3 Hard extractor — Docling adapter
 
+The enterprise hard path is Kelpie-backed: it renders the selected page and
+uses the discovered `VisionBackend.transcribe_page()` contract to call models
+hosted locally on EDAG servers. No model file is installed on the enterprise
+PC. The Kelpie hard-page adapter is a follow-up implementation seam; until it
+exists, hard pages fail in isolation or use the text-backed fallback where
+eligible.
+
 ```python
 class HardExtractor(Protocol):
     def extract(self, source: Path, pages: Sequence[int], ctx: RunContext) -> dict[int, list[Block]]: ...
@@ -367,8 +375,8 @@ class HardExtractor(Protocol):
 
 `DoclingExtractor` rules:
 - `import docling` **inside** `__init__`/first call only (lazy). One `DocumentConverter` instance per `DoclingExtractor`, created on first use, reused for all pages of the run (and across documents if the same `RunContext` is reused by the benchmark).
-- Pipeline options: OCR enabled with languages `en`, `de` when local OCR artifacts are available; table structure enabled; **picture description/classification off**; accelerator = CPU with `num_threads = cfg.hard.threads`; model artifacts must come from `cfg.hard.artifacts_path` in enterprise runtime. Remote downloads require an explicit development-only opt-in.
-- If local artifacts are not configured or do not exist, raise `HardExtractionError` before initializing the pipeline. The converter records the affected page as failed and continues; it never disables TLS verification or silently downloads models.
+- Docling is a disposable development/diagnostic adapter only. Enterprise PCs must not install, copy, provision, or download its OCR/layout model artifacts. Pipeline options remain CPU, table structure enabled, and **picture description/classification off** when the adapter is explicitly exercised outside the enterprise runtime.
+- If the development adapter is unavailable, or if the enterprise Kelpie-backed hard path is not implemented, raise `HardExtractionError` before initializing the pipeline. The converter records the affected page as failed and continues; it never disables TLS verification or suggests local model provisioning.
 - Page selection: preferred is Docling's page-range option of `convert(...)`; if unavailable in the installed version, create a temporary sub-PDF containing only routed pages (pypdfium2 `import_pages`) and keep a `sub_index -> original_page` map. Whichever is used, **map back to original page numbers**. Phase 0 records which one works.
 - Batch all routed pages of a document in **one** call where contiguous ranges allow, to amortise overhead; otherwise one call per contiguous range.
 - Map Docling items to `Block`: section headers → `heading` (level from Docling), text → `paragraph`, list items → `list`, tables → `table` (Markdown via Docling table export, `meta` holds rows/cols), pictures → handled by the image stage (no `figure` block created here, to avoid double work). `Provenance.source="docling"`, `bbox` copied if available.
@@ -416,7 +424,7 @@ Contract rules for every implementation:
 |----------|---------------|-----------------|--------------|
 | `tiered` | router | TEXT→fast, COMPLEX/SCANNED→hard | on (filter + describe) |
 | `full-vision` | all pages → vision | render page at `cfg.vision.page_dpi` (default 150) → `transcribe_page` → Markdown block(s) with `source="vision"` | **off** (page transcription already describes images; avoids double counting) |
-| `docling-only` | all pages → hard | Docling | on |
+| `docling-only` | all pages → hard | Docling development diagnostic only | on |
 | `baseline_current` (bench only) | external | black-box adapter, see §7.3 | n/a |
 
 A `Pipeline` is a small dataclass `(name, policy, images_enabled)`; `bench/pipelines.py` registers them. No subclassing.
@@ -507,14 +515,14 @@ The system is a **batch pipeline**, not a long-running service, so state is deli
 1. **Immutable data flows between stages.** Pydantic frozen models; stages return new objects. No stage mutates another's output.
 2. **`RunContext` is the only carrier of cross-cutting state.** Contains: `config` (frozen), `vision: VisionBackend`, `hard: HardExtractor`, `cache: DiskCache`, `metrics: MetricsCollector`, `clock` (injectable for tests), `logger`. Built once by `build_context()`; fakes are injected in tests by constructing the context manually.
 3. **The disk cache is the only persistent state** (`.doc2md_cache/`, §11). Keys are content-addressed; entries are immutable JSON written atomically (write to temp file in same directory, `os.replace`). No locking needed for single-process use; concurrent writers of the same key are harmless (same content).
-4. **Heavy objects are owned by their adapter and created lazily:** Docling `DocumentConverter` (expensive model load) inside `DoclingExtractor`; HTTP client inside `KelpieVisionBackend`. Both are closed via `RunContext.close()` / context manager.
+4. **Heavy objects are owned by their adapter and created lazily:** the optional development Docling `DocumentConverter` (expensive model load) stays inside `DoclingExtractor`; the HTTP client for approved remote services stays inside its adapter. Both are closed via `RunContext.close()` / context manager.
 5. **Concurrency model:**
    - Page loop: **sequential** (pdfplumber page objects are not thread-safe and Docling on CPU is already multi-threaded internally).
    - Vision calls (images, and pages in `full-vision`): **bounded `ThreadPoolExecutor`** (`vision.max_workers`, default 4; tune to what the local Kelpie model tolerates — Phase 0 records the safe value). Results are re-ordered by page/image index before assembly so output is deterministic.
    - `MetricsCollector` is thread-safe (a lock around appends).
 6. **Page-level failure isolation:** each page's extraction is wrapped; exceptions become `PageResult(status="failed", error=...)`. Image-level failures become `ImageRecord(status="failed")`.
 7. **Determinism:** fixed seeds in benchmark sampling, `temperature=0`, sorted iteration, no timestamps inside Markdown/JSON content (timestamps only in `run.json`/`env.json`).
-8. **Benchmark isolation:** each (doc, pipeline, rep) uses a fresh output dir and, when `cold_cache=true`, a fresh cache directory. The Docling model load happens once per process; the runner records a **warm-up run** separately so one-off load time does not pollute the first measurement (the load time is reported on its own line).
+8. **Benchmark isolation:** each (doc, pipeline, rep) uses a fresh output dir and, when `cold_cache=true`, a fresh cache directory. Any disposable development Docling load is measured separately and never treated as an enterprise runtime requirement.
 
 ## 9. Configuration
 
@@ -533,13 +541,16 @@ image_page_min_chars = 400
 [fast]
 heading_ratio = 1.25
 column_gutter_min_pt = 20
+strip_repeated_margins = true
+repeated_margin_min_pages = 2
+margin_zone_ratio = 0.12
 
 [hard]
-engine = "docling"
+engine = "docling-dev-only"        # enterprise target: Kelpie-backed hard path
 languages = ["en", "de"]
 threads = 4
-artifacts_path = ""            # enterprise runtime requires a local artifact directory
-allow_remote_download = false  # development/provisioning only; never the product default
+page_dpi = 200
+# No enterprise model/artifact path exists. Hard processing uses Kelpie/Helios on EDAG servers.
 
 [images]
 enabled = true
@@ -555,6 +566,7 @@ backend = "kelpie"             # "fake" for tests
 max_workers = 4
 page_dpi = 150
 max_tokens = 800
+transcribe_max_tokens = 1600
 temperature = 0.0
 timeout_s = 120
 max_retries = 3
@@ -588,7 +600,7 @@ Exception hierarchy (`errors.py`): `Doc2MdError` ← `ConfigError`, `Unsupported
 |-----------|-----------|
 | File missing/unreadable/encrypted | `SourceError`, exit 1 (encrypted: message says password unsupported in v1) |
 | One page fails in fast or hard path | page `failed`, placeholder in Markdown, continue; warning in `run.json` |
-| Docling not installed or local artifacts unavailable but a page needs it | `HardExtractionError` for those pages with a clear install/provisioning hint; pages still marked failed, others continue |
+| Docling unavailable or Kelpie hard path not implemented | `HardExtractionError` for those pages with a clear enterprise-boundary message; pages still marked failed, others continue |
 | Kelpie unreachable | image stage: images marked `failed`, document completes, warning; `full-vision` pipeline: exit 4 |
 | Kelpie transient error | retry with backoff; then failed record |
 | Invalid config | `ConfigError`, exit 2, message names the key |

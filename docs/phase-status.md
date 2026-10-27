@@ -6,21 +6,23 @@
 | 1 | Complete | 4 tests, CLI/API, provenance sidecar, deterministic outputs | `phase-1` |
 | 2 | Complete | 21 tests, normalization and real ligature fixture | `phase-2` |
 | 3 | Complete | 34 default tests, `inspect`, signals and routing | `phase-3` |
-| 4 | Complete within enterprise perimeter | Docling table/page-range tests; local artifacts required; OCR download skipped by TLS boundary | `phase-4` |
+| 4 | Complete as development adapter | Docling table/page-range tests; local model execution is outside enterprise scope; OCR measurements await the Kelpie-backed hard path | `phase-4` |
 | 5 | Complete | 40 default tests, FakeVisionBackend, image filtering/dedupe, real Kelpie probe | `phase-5` |
 | 6 | Complete with local-environment exception | FR3 enrichment, three pipelines, JSON cache, no-cache, derived call/token metrics; 46 default tests | `phase-6` |
 | 7 | Complete with baseline exception | Benchmark suite loader, cold-cache runner, exact results CSV, deterministic report; 50 default tests | `phase-7` |
 | 8 | Complete with environment exceptions | Stratified blind review, rubric, tolerant judge parser, merged quality report; 54 default tests | `phase-8` |
+| 9 | Complete with baseline and runtime environment exceptions | Corpus discovery, 13-PDF offline benchmark smoke run, findings, packaging, and release documentation; 56 default tests | `phase-9` |
 
 ## Accepted Constraints
 
-- Four additional real documents are still needed before benchmark work.
-- Docling/OCR artifacts must be provisioned locally; runtime downloads are outside the product perimeter.
-- Scanned OCR is unavailable until those local artifacts are provisioned.
+- The current corpus includes every permitted sample and committed
+  synthetic PDF; the cloned reference repository currently contributes no PDFs.
+- Local Docling/OCR model execution and runtime downloads are outside the enterprise product perimeter.
+- Scanned OCR is unavailable until the Kelpie-backed hard path is integrated.
 
 ## Remaining Product Work
 
-- Phase 9: real findings, packaging, and release documentation.
+- Phase 9: final findings, packaging, and release documentation.
 
 ## Phase 6 Notes
 
@@ -43,3 +45,13 @@
   fake backends.
 - Real Kelpie scoring and real-document review remain environment/stakeholder
   work; no confidential samples or model responses are committed.
+
+## Phase 9 Scope Notes
+
+- The real EDAG OCR baseline is intentionally excluded from Phase 9 and will be
+  tested in parallel by the human using the same discovered PDF corpus.
+- The cloned reference repository currently contains no PDF files; discovery
+  remains dynamic so later permitted PDFs are included without copying them.
+- Offline benchmark smoke run: `bench_runs/phase9-corpus/20261023-133515/`.
+- Packaging wheel build passed; real Kelpie/Docling quality measurements remain
+  environment-dependent and are not claimed by the offline smoke results.

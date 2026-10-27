@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import re
 
 _LIGATURES = str.maketrans(
@@ -14,6 +15,7 @@ _LIGATURES = str.maketrans(
     }
 )
 _GARBLED_RE = re.compile(r"\(cid:\d+\)|\ufffd|[\ue000-\uf8ff]")
+_CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
 
 
 def _join_hyphenated_lines(text: str) -> str:
@@ -39,7 +41,9 @@ def _join_hyphenated_lines(text: str) -> str:
 
 def normalize_text(text: str, *, preserve_lines: bool = False) -> str:
     """Normalize PDF text without changing language-specific characters."""
-    normalized = text.translate(_LIGATURES).replace("\u00ad", "")
+    normalized = html.unescape(text).translate(_LIGATURES).replace("\u00ad", "")
+    normalized = normalized.replace("\u00a0", " ")
+    normalized = _CONTROL_RE.sub(" ", normalized)
     normalized = _join_hyphenated_lines(normalized)
     if preserve_lines:
         lines = [re.sub(r"[ \t\f\v]+", " ", line).strip() for line in normalized.split("\n")]
@@ -49,4 +53,4 @@ def normalize_text(text: str, *, preserve_lines: bool = False) -> str:
 
 def is_garbled(text: str) -> bool:
     """Return whether text contains common PDF glyph-decoding artifacts."""
-    return _GARBLED_RE.search(text) is not None
+    return _GARBLED_RE.search(text) is not None or _CONTROL_RE.search(text) is not None

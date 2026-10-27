@@ -42,8 +42,18 @@ def test_normalize_removes_soft_hyphen_and_preserves_german_characters() -> None
     assert normalize_text("Straße Über­größe") == "Straße Übergröße"
 
 
+def test_normalize_removes_disallowed_control_characters() -> None:
+    assert normalize_text("di\x00cult\x01 text\twith\nspacing") == "di cult text with spacing"
+
+
+def test_normalize_decodes_html_whitespace_entities() -> None:
+    assert normalize_text("B.1.2 &nbsp; IT Help Desk") == "B.1.2 IT Help Desk"
+    assert normalize_text("Tom &amp; Jerry") == "Tom & Jerry"
+
+
 def test_garbled_cid_text_is_flagged() -> None:
     assert is_garbled("value (cid:12)(cid:45)")
+    assert is_garbled("di\x00cult")
     assert not is_garbled("Straße")
 
 
@@ -56,6 +66,17 @@ def test_fast_extractor_normalizes_the_whole_page_before_splitting() -> None:
 
     assert [block.text for block in blocks] == ["flow", "example", "(cid:12)"]
     assert blocks[-1].meta == {"garbled": True}
+
+
+def test_fast_extractor_keeps_numeric_footnotes_as_paragraphs() -> None:
+    class FakePage:
+        def extract_text(self, **_: object) -> str:
+            return "2 Definition: See A.2"
+
+    blocks = extract_page(FakePage(), 1)  # type: ignore[arg-type]
+
+    assert blocks[0].type == "paragraph"
+    assert blocks[0].markdown == "2 Definition: See A.2"
 
 
 def test_ligature_fixture_is_normalized_through_pdf_extraction() -> None:

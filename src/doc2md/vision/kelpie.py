@@ -132,8 +132,13 @@ class KelpieVisionBackend:
             request_id=getattr(response, "id", None),
         )
 
-    def describe_image(
-        self, image_png: bytes, *, prompt_id: str, lang: str = "auto"
+    def _describe_image(
+        self,
+        image_png: bytes,
+        *,
+        prompt_id: str,
+        lang: str,
+        max_output_tokens: int,
     ) -> VisionResult:
         prompt = self._prompt(prompt_id)
         if lang != "auto":
@@ -155,7 +160,7 @@ class KelpieVisionBackend:
                         ],
                     }
                 ],
-                max_output_tokens=self.config.max_tokens,
+                max_output_tokens=max_output_tokens,
                 store=False,
             )
         )
@@ -167,7 +172,22 @@ class KelpieVisionBackend:
             request_id=getattr(response, "id", None),
         )
 
+    def describe_image(
+        self, image_png: bytes, *, prompt_id: str, lang: str = "auto"
+    ) -> VisionResult:
+        return self._describe_image(
+            image_png,
+            prompt_id=prompt_id,
+            lang=lang,
+            max_output_tokens=self.config.max_tokens,
+        )
+
     def transcribe_page(
         self, image_png: bytes, *, prompt_id: str, lang: str = "auto"
     ) -> VisionResult:
-        return self.describe_image(image_png, prompt_id=prompt_id, lang=lang)
+        return self._describe_image(
+            image_png,
+            prompt_id=prompt_id,
+            lang=lang,
+            max_output_tokens=self.config.transcribe_max_tokens,
+        )

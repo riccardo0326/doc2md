@@ -20,7 +20,7 @@ baseline must be verified before their concrete integrations are implemented.
 
 - `tiered` uses the router: `TEXT` uses pdfplumber; `COMPLEX` and `SCANNED`
   use Docling.
-- `SCANNED` pages use Docling OCR with `en+de`.
+- `SCANNED` pages use the Kelpie-backed hard path, with models hosted locally on EDAG servers. Docling OCR is development-only; until the Kelpie hard path is implemented, record an isolated failure.
 - `full-vision` sends every page to vision and disables the image stage.
 - `docling-only` sends every page to Docling, extracts and saves images, but
   never calls vision. Saved images are linked without descriptions and are
@@ -307,9 +307,11 @@ common `Block` model with `source="docling"`.
 original page number in provenance. Keeping the converter inside the adapter
 avoids importing or loading Docling for text-only conversions.
 
-**Environment note:** OCR integration is implemented and tested, but the local
-RapidOCR model download is currently blocked by the workstation's corporate TLS
-certificate chain; the slow OCR test records this as an environment skip.
+**Environment note:** OCR integration is implemented behind the replaceable hard
+adapter, but local OCR/model execution is outside the enterprise product
+boundary. The workstation's corporate TLS policy also prevents model downloads;
+ the slow OCR test records this as an environment skip. Enterprise support waits
+ for the Kelpie-backed hard-processing path.
 
 ## ADR-025: Phase 5 vision transport and image identity
 
@@ -334,19 +336,20 @@ required by FR3.
 yet a semantically rich document representation. This is product work distinct
 from the completed Phase 5 image/vision pipeline.
 
-## ADR-024: Enterprise Docling artifact boundary
+## ADR-024: Enterprise no-local-model boundary
 
-**Decision:** Runtime Docling model downloads are outside the enterprise
-product perimeter. `DoclingExtractor` requires a local `hard.artifacts_path` by
-default; remote downloads are available only through an explicit
-`allow_remote_download=true` setting for controlled development or provisioning.
-Missing local artifacts fail the affected hard page without aborting the
-document. OCR for scanned pages is not a guaranteed capability until OCR
-artifacts are provisioned locally.
+**Decision:** OCR, layout, and LLM model files are out of scope on enterprise
+PCs. They must not be installed, copied, provisioned, or downloaded there.
+Docling remains a disposable development diagnostic only. Enterprise hard pages
+must use Kelpie with models hosted locally on EDAG servers, through the
+discovered `VisionBackend`/`transcribe_page` contract; until that Kelpie hard
+path exists, affected pages fail in isolation with an explicit runtime-boundary
+message.
 
-**Reason:** The target corporate machines reject the model-download TLS chain
-and do not have a local Tesseract alternative. A production conversion must
-never depend on an unverified external download or silently disable TLS.
+**Reason:** The target corporate machines reject model-download TLS and cannot
+host local model artifacts. Kelpie already provides the approved service boundary
+to EDAG-hosted models. A production conversion must use that boundary, never
+install models locally, bypass TLS, or silently download models.
 
 ## ADR-022: Phase 3 routing boundary
 
@@ -391,8 +394,9 @@ uses Docling for every page and saves images without vision calls.
 
 **Reason:** Keeping cache state and operational metrics at adapter boundaries
 prevents stale usage totals and keeps benchmark measurements comparable. The
-Docling adapter continues to reject missing local artifacts unless the explicit
-controlled-development remote-download opt-in is set.
+optional development Docling adapter is never an enterprise runtime
+requirement; hard-page availability is reported through the approved remote
+adapter boundary.
 
 ## ADR-029: Phase 7 benchmark isolation
 
@@ -427,3 +431,157 @@ judge means separate and states the local-model/style-bias limitation.
 
 **Reason:** Reviewers must not be primed by pipeline names, and a faulty judge
 response must never invalidate the rest of a quality run.
+
+## ADR-031: Phase 9 corpus and baseline scope
+
+**Decision:** The Phase 9 benchmark corpus is assembled from permitted external
+PDFs, committed synthetic fixtures, and every PDF discovered beneath the
+read-only reference repository `C:\Users\rp99480\dev\ai4tc_webapp` when such
+files are available. Discovery records paths and SHA-256 values without
+copying PDF bytes into this repository.
+
+The real EDAG OCR software is explicitly outside the Phase 9 implementation and
+acceptance gate. Phase 9 compares `tiered` against `full-vision`; the human may
+run the existing OCR software in parallel against the same corpus. A future
+adapter can be added when its invocation and token reporting are available.
+
+**Reason:** This preserves confidentiality and keeps the final deliverable
+useful now, while avoiding invented claims about an unavailable external
+baseline.
+
+## ADR-032: External quality case boundary
+
+**Decision:** Keep user-supplied PDFs, reference Markdown, generated outputs,
+model responses, and token values outside the repository. Validate the supplied
+case through synthetic committed fixtures and a path-driven local quality
+runner. The external reference is a quality oracle for evaluation only; it is
+never read by production extraction logic and never drives a filename-,
+page-, or phrase-specific branch.
+
+**Reason:** The sample is confidential and the requested improvement must be a
+general PDF-to-Markdown capability, not a hardcoded reconstruction of one
+document. This boundary also keeps the default test suite offline and
+repeatable.
+
+## ADR-033: Text-backed hard-path fallback
+
+**Decision:** In the `tiered` pipeline, if a `COMPLEX` page has a usable text
+layer and the hard extractor raises `HardExtractionError`, run the existing
+pdfplumber fast extractor as a degraded fallback. Keep the original
+`page_class="COMPLEX"`, set the page method to `pdfplumber`, and record the
+hard-path error in a `hard_path_fallback` warning. A `SCANNED` page never uses
+this fallback and remains failed when its hard path fails. The Kelpie-backed
+hard path, using models hosted locally on EDAG servers, remains the enterprise
+preferred method; Docling is only a disposable development diagnostic.
+
+**Reason:** Missing or unavailable hard processing must not discard text that
+can be recovered deterministically from a digital page. The warning makes the
+quality trade-off and provisioning problem visible; it does not claim
+Docling-level layout or table fidelity.
+
+## ADR-034: Repeated margin filtering
+
+**Decision:** Enable a configurable fast-path filter that removes first/last
+pdfplumber blocks repeated across at least two pages and removes numeric footer
+blocks when numeric footers occur on multiple pages. If a repeated margin also
+appears on page 1, preserve the page-1 occurrence as cover metadata. The filter
+is disabled with `fast.strip_repeated_margins=false` and never examines text
+outside page margins.
+
+**Reason:** Running headers and printed page numbers are layout furniture in
+digital PDFs and otherwise pollute the Markdown. Requiring repeated margin
+position/content avoids hardcoding document titles or removing unique body
+text.
+
+## ADR-035: Relative image-area filtering
+
+**Decision:** Add `images.min_page_area_ratio`, defaulting to `0.02`, to the
+existing absolute image thresholds. An embedded image is marked
+`skip_reason="too_small"` when its PDF bounding-box area is below that fraction
+of a valid page area, unless it already fails an absolute/aspect/duplicate
+rule. Invalid page dimensions fall back to the absolute rules. The threshold
+is configurable and participates in the output configuration hash.
+
+**Reason:** Absolute pixel thresholds cannot distinguish a small decorative
+asset from a meaningful figure at a different page scale. A relative signal
+skips the observed decorative logo without naming it or depending on a page
+number, while keeping the existing figure and duplicate behavior.
+
+## ADR-036: Path-driven quality runner
+
+**Decision:** Add `scripts/check_quality.py` as a local-only evaluator that
+invokes the public API with the fake vision backend by default, validates the
+published Markdown/sidecar, reports environment capability flags, and accepts
+an optional external reference Markdown. Reference comparison uses normalized
+token coverage with a 90% warning/failure threshold rather than byte equality.
+Generated outputs and reports are supplied by the caller and remain outside
+the repository.
+
+**Reason:** Quality checks must be repeatable on confidential PDFs without
+committing those PDFs or coupling production code to one reference renderer.
+The fake backend keeps the default check offline while an explicit Kelpie
+option remains available for controlled environments.
+
+## ADR-037: Unstructured-demo parser fixes
+
+**Decision:** Treat pages with no text, images, or tables as successful empty
+`TEXT` pages; detect conservative borderless tables from aligned rows with
+numeric evidence; flatten list-bearing irregular table cells into semantic
+paragraph/list blocks; and replace disallowed C0/C1 control characters with
+spaces while marking them as garbled. Same-baseline words separated by a
+column-sized horizontal gap form separate lines before reading-order assembly.
+
+**Reason:** The unstructured-demo corpus exposed generic parser failures that
+were independent of any one filename: empty-page OCR routing, premature
+column merging, borderless tables, lists inside cells, and binary/control
+artifacts. These rules preserve the existing data model and keep the hard path
+replaceable without hardcoding sample content or assuming local model files.
+
+## ADR-038: Enterprise model-hosting boundary
+
+**Decision:** The supported runtime is restricted to enterprise PCs with the
+same corporate network and TLS constraints as the development target. OCR,
+layout, and LLM model files must not be installed, copied, provisioned, or
+downloaded on those PCs. All model inference must cross Kelpie, using models
+hosted locally on EDAG servers. The existing Kelpie vision contract is known;
+the hard page path must reuse that boundary for scanned/layout-heavy pages.
+Disposable development Docling experiments are not a product prerequisite or
+an enterprise setup instruction.
+
+**Reason:** The enterprise machine cannot install local models and rejects the
+model-download certificate chain. Kelpie already provides the approved route to
+EDAG-hosted models. Treating local provisioning as a future fix would misstate
+the supported product and repeatedly lead implementation work toward an
+impossible deployment path.
+
+## ADR-039: Kelpie hard-page implementation
+
+**Decision:** The enterprise hard path renders only routed `COMPLEX` and
+`SCANNED` pages locally and sends their PNG bytes to Kelpie through the existing
+`VisionBackend.transcribe_page()` contract. The default deployment is
+`DARE-NoCloud-Helios`; its response is parsed as Markdown into common heading,
+paragraph, list, and table blocks. The default tiered pipeline never initializes
+Docling for enterprise hard pages.
+
+**Reason:** Helios is the verified vision-capable EDAG-hosted deployment. This
+keeps model inference on EDAG servers, preserves the tiered cost model for
+ordinary text pages, and reuses the discovered Kelpie API instead of inventing
+a second service or installing local model files.
+
+## ADR-040: Markdown layout-artifact handling
+
+**Decision:** Normalize HTML entities and non-breaking spaces at the shared text
+boundary. Detect repeated top and bottom margin lines from the cheap PDF text
+layer before fast-path semantic parsing, then defensively remove matching
+margin blocks from hard-path output. Repeated headers, footers, and numeric page
+footers are layout furniture and are not emitted as content blocks.
+
+Section headings at level two or deeper render as `##` regardless of numeric
+depth. Irregular-table fallback keeps cell content in a table representation
+instead of promoting cell bullets to document-level lists. Markdown page
+markers are opt-in; JSON page and block provenance remains authoritative.
+
+**Reason:** The quality run showed that running furniture contaminates heading
+and list inference, Kelpie can return `&nbsp;`, and flattening table cells
+creates misleading list structure. These rules improve consumer-facing
+Markdown without adding document-specific branches or removing provenance.

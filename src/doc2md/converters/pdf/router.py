@@ -5,8 +5,16 @@ from ...models import PageClass, PageSignals, RouteDecision
 
 
 def classify(signals: PageSignals, config: RouterConfig, *, page: int = 0) -> RouteDecision:
-    if not signals.has_text_layer:
-        page_class: PageClass = "SCANNED"
+    if (
+        signals.chars == 0
+        and signals.words == 0
+        and signals.image_count == 0
+        and signals.table_count == 0
+    ):
+        page_class: PageClass = "TEXT"
+        reasons = ["empty_page"]
+    elif not signals.has_text_layer:
+        page_class = "SCANNED"
         reasons = ["no_text_layer"]
     elif signals.chars < config.min_chars and signals.image_area_ratio >= config.scan_image_ratio:
         page_class = "SCANNED"
